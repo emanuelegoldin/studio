@@ -18,17 +18,6 @@ import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 
-interface UserProfile {
-  id: string;
-  userId: string;
-  displayName: string | null;
-  bio: string | null;
-  avatarUrl: string | null;
-  displayNamePublic: boolean;
-  bioPublic: boolean;
-  avatarPublic: boolean;
-}
-
 interface User {
   id: string;
   username: string;
@@ -49,7 +38,6 @@ function ProfileForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [displayNamePublic, setDisplayNamePublic] = useState(true);
@@ -62,7 +50,6 @@ function ProfileForm() {
       
       if (response.ok) {
         setUser(data.user);
-        setProfile(data.profile);
         setDisplayName(data.profile?.displayName || '');
         setBio(data.profile?.bio || '');
         setDisplayNamePublic(data.profile?.displayNamePublic ?? true);
@@ -100,7 +87,6 @@ function ProfileForm() {
       const data = await response.json();
 
       if (response.ok) {
-        setProfile(data.profile);
         toast({
           title: "Success",
           description: "Profile updated successfully",

@@ -99,7 +99,7 @@ export async function updateResolution(
 
   // Only update if the user owns the resolution
   // Spec: 03-personal-resolutions.md - Only the resolution owner can update
-  const result = await query<{ affectedRows: number }>(
+  await query(
     `UPDATE resolutions SET text = ? WHERE id = ? AND owner_user_id = ?`,
     [trimmedText, id, ownerUserId]
   );

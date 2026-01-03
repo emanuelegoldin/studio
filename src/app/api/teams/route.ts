@@ -10,7 +10,6 @@ import {
   getTeamsForUser, 
   getTeamWithMembers,
   setTeamResolution,
-  createTeamInvitation,
   isTeamLeader,
 } from '@/lib/db';
 

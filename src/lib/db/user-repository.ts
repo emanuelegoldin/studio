@@ -80,7 +80,32 @@ function rowToProfile(row: UserProfileRow): UserProfile {
 
 // Password hashing configuration
 // Can be adjusted via environment variable based on server performance
-const SALT_ROUNDS = parseInt(process.env.PASSWORD_SALT_ROUNDS || '12', 10);
+// Valid range: 10-15 (higher = more secure but slower)
+const DEFAULT_SALT_ROUNDS = 12;
+const MIN_SALT_ROUNDS = 10;
+const MAX_SALT_ROUNDS = 15;
+
+function getSaltRounds(): number {
+  const envValue = process.env.PASSWORD_SALT_ROUNDS;
+  if (!envValue) {
+    return DEFAULT_SALT_ROUNDS;
+  }
+  
+  const parsed = parseInt(envValue, 10);
+  if (isNaN(parsed)) {
+    console.warn(`Invalid PASSWORD_SALT_ROUNDS value "${envValue}", using default ${DEFAULT_SALT_ROUNDS}`);
+    return DEFAULT_SALT_ROUNDS;
+  }
+  
+  if (parsed < MIN_SALT_ROUNDS || parsed > MAX_SALT_ROUNDS) {
+    console.warn(`PASSWORD_SALT_ROUNDS ${parsed} out of range (${MIN_SALT_ROUNDS}-${MAX_SALT_ROUNDS}), using default ${DEFAULT_SALT_ROUNDS}`);
+    return DEFAULT_SALT_ROUNDS;
+  }
+  
+  return parsed;
+}
+
+const SALT_ROUNDS = getSaltRounds();
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
