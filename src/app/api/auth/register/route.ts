@@ -69,16 +69,24 @@ export async function POST(request: NextRequest) {
     // Spec: 01-authentication.md - System sends a verification email
     const verificationToken = await createVerificationToken(user.id);
 
-    // In a real implementation, send email here
-    // For now, return the token for testing purposes
-    console.log(`Verification token for ${email}: ${verificationToken.token}`);
+    // In production, send email here with the verification link
+    // The token would be included in an email link like: /verify?token=xxx
+    // For development, the token is logged to console only
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV] Verification token for ${email}: ${verificationToken.token}`);
+    }
 
-    return NextResponse.json({
+    const response: { message: string; userId: string; verificationToken?: string } = {
       message: 'Registration successful. Please check your email to verify your account.',
       userId: user.id,
-      // Remove in production - only for development/testing
-      verificationToken: verificationToken.token,
-    }, { status: 201 });
+    };
+
+    // Only include token in development for testing purposes
+    if (process.env.NODE_ENV !== 'production') {
+      response.verificationToken = verificationToken.token;
+    }
+
+    return NextResponse.json(response, { status: 201 });
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(

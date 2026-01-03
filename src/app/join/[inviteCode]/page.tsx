@@ -28,7 +28,7 @@ export default function JoinTeamPage({ params }: { params: Promise<{ inviteCode:
     setStatus('joining');
 
     try {
-      const response = await fetch(`/api/teams/join/join`, {
+      const response = await fetch(`/api/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

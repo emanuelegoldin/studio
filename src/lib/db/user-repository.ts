@@ -78,8 +78,9 @@ function rowToProfile(row: UserProfileRow): UserProfile {
   };
 }
 
-// Password hashing
-const SALT_ROUNDS = 12;
+// Password hashing configuration
+// Can be adjusted via environment variable based on server performance
+const SALT_ROUNDS = parseInt(process.env.PASSWORD_SALT_ROUNDS || '12', 10);
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
