@@ -5,6 +5,14 @@
 
 import mysql from 'mysql2/promise';
 
+// Warn if sensitive database configuration is using defaults in non-development environments
+if (process.env.NODE_ENV !== 'development' && !process.env.DB_PASSWORD) {
+  console.warn(
+    '[SECURITY WARNING] DB_PASSWORD is not set. Using empty password default is a security risk in production. ' +
+    'Please set the DB_PASSWORD environment variable.'
+  );
+}
+
 // Database configuration from environment variables
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
