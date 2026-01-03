@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * User Authentication Form
+ * Spec Reference: 01-authentication.md - Registration, Login
+ */
+
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -29,59 +35,66 @@ const registerSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
 });
 
+type LoginFormData = z.infer<typeof loginSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
+
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
   variant: "login" | "register";
 }
 
-export function UserAuthForm({ className, variant, ...props }: UserAuthFormProps) {
+function LoginForm({ className, ...props }: Omit<UserAuthFormProps, 'variant'>) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
-  
-  const schema = variant === "login" ? loginSchema : registerSchema;
-  type FormData = z.infer<typeof schema>;
 
-  const form = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: variant === 'login' ? {
-      email: "",
-      password: ""
-    } : {
-      username: "",
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
       email: "",
       password: ""
     }
   });
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: LoginFormData) {
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    console.log(data); // In a real app, you'd send this to your backend
-    setIsLoading(false);
-    router.push("/dashboard");
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Logged in successfully!",
+        });
+        router.push("/dashboard");
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to login",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
     <div className={cn("grid gap-6", className)} {...props}>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {variant === 'register' && (
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Your Name" {...field} disabled={isLoading} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
           <FormField
             control={form.control}
             name="email"
@@ -112,10 +125,122 @@ export function UserAuthForm({ className, variant, ...props }: UserAuthFormProps
             {isLoading && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {variant === "login" ? "Sign In" : "Create Account"}
+            Sign In
           </Button>
         </form>
       </Form>
     </div>
   );
+}
+
+function RegisterForm({ className, ...props }: Omit<UserAuthFormProps, 'variant'>) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState<boolean>(false);
+
+  const form = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: ""
+    }
+  });
+
+  async function onSubmit(data: RegisterFormData) {
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Account created! Please check your email to verify your account.",
+        });
+        router.push("/login");
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to register",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className={cn("grid gap-6", className)} {...props}>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl>
+                  <Input placeholder="Your Name" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            Create Account
+          </Button>
+        </form>
+      </Form>
+    </div>
+  );
+}
+
+export function UserAuthForm({ variant, ...props }: UserAuthFormProps) {
+  if (variant === "login") {
+    return <LoginForm {...props} />;
+  }
+  return <RegisterForm {...props} />;
 }

@@ -1,7 +1,11 @@
 "use client";
 
+/**
+ * Bingo Card Component
+ * Spec Reference: 05-bingo-card-generation.md, 06-bingo-gameplay.md
+ */
+
 import { useState } from "react";
-import type { Resolution } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import { Star, Check, Hourglass, ThumbsUp, X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -16,31 +20,60 @@ import {
 import { Badge } from "./ui/badge";
 import { Textarea } from "./ui/textarea";
 
-interface BingoSquareProps {
-  resolution: Resolution;
-  onUpdate: (resolution: Resolution, status: Resolution['status']) => void;
+interface BingoCell {
+  id: string;
+  cardId: string;
+  position: number;
+  resolutionText: string;
+  isJoker: boolean;
+  isEmpty: boolean;
+  sourceType: string;
+  sourceUserId: string | null;
+  state: 'to_complete' | 'completed';
+  proof: {
+    id: string;
+    status: 'pending' | 'approved' | 'declined';
+  } | null;
 }
 
-const statusConfig = {
-    tocomplete: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
-    pending: { icon: <Hourglass className="h-4 w-4 text-amber-500" />, color: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-800 dark:text-amber-300" },
-    completed: { icon: <Check className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300 line-through" },
-    rejected: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
+interface BingoSquareProps {
+  cell: BingoCell;
+  isOwner: boolean;
+  onUpdate?: (cellId: string, newState: 'to_complete' | 'completed') => void;
+}
+
+const stateConfig = {
+  to_complete: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
+  pending: { icon: <Hourglass className="h-4 w-4 text-amber-500" />, color: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-800 dark:text-amber-300" },
+  completed: { icon: <Check className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300 line-through" },
+  declined: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
 };
 
-function BingoSquare({ resolution, onUpdate }: BingoSquareProps) {
+function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const isJoker = resolution.id === "joker";
   
-  const config = statusConfig[resolution.status] || statusConfig.tocomplete;
+  // Determine visual state based on cell state and proof status
+  let visualState: keyof typeof stateConfig = cell.state;
+  if (cell.proof) {
+    if (cell.proof.status === 'pending') visualState = 'pending';
+    else if (cell.proof.status === 'declined') visualState = 'declined';
+  }
+  
+  const config = stateConfig[visualState] || stateConfig.to_complete;
+  
+  // Spec: 06-bingo-gameplay.md - Empty cells cannot be marked as completed
+  // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
+  const canInteract = isOwner && !cell.isJoker && !cell.isEmpty && cell.state === 'to_complete';
 
   const handleClick = () => {
-    if (isJoker || resolution.status !== 'tocomplete') return;
+    if (!canInteract) return;
     setIsModalOpen(true);
   };
 
   const handleValidationRequest = () => {
-    onUpdate(resolution, 'pending');
+    if (onUpdate) {
+      onUpdate(cell.id, 'completed');
+    }
     setIsModalOpen(false);
   };
 
@@ -48,25 +81,31 @@ function BingoSquare({ resolution, onUpdate }: BingoSquareProps) {
     <>
       <button
         onClick={handleClick}
-        disabled={isJoker || resolution.status !== 'tocomplete'}
+        disabled={!canInteract}
         className={cn(
           "relative flex flex-col items-center justify-center aspect-square p-2 rounded-lg border shadow-sm text-center transition-all duration-300",
           config.color,
-          isJoker ? "bg-primary text-primary-foreground cursor-default" : "cursor-pointer",
-          resolution.status === 'tocomplete' && !isJoker ? "hover:scale-105 hover:shadow-md" : ""
+          cell.isJoker ? "bg-primary text-primary-foreground cursor-default" : "",
+          cell.isEmpty ? "bg-muted cursor-not-allowed" : "",
+          canInteract ? "cursor-pointer hover:scale-105 hover:shadow-md" : "cursor-default"
         )}
       >
-        {isJoker && <Star className="h-8 w-8 mb-1" />}
-        <p className={cn("text-xs md:text-sm font-medium", config.text)}>
-          {resolution.text}
+        {cell.isJoker && <Star className="h-8 w-8 mb-1" />}
+        <p className={cn("text-xs md:text-sm font-medium", config.text, cell.isJoker && "text-primary-foreground")}>
+          {cell.resolutionText}
         </p>
         <div className="absolute top-1 right-1">
-          {resolution.status !== 'tocomplete' && !isJoker && config.icon}
+          {visualState !== 'to_complete' && !cell.isJoker && config.icon}
         </div>
-        {!isJoker && resolution.proposer && (
-            <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
-              {resolution.proposer}
-            </Badge>
+        {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'member_provided' && (
+          <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
+            From Team
+          </Badge>
+        )}
+        {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'personal' && (
+          <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
+            Personal
+          </Badge>
         )}
       </button>
 
@@ -75,16 +114,16 @@ function BingoSquare({ resolution, onUpdate }: BingoSquareProps) {
           <DialogHeader>
             <DialogTitle className="font-headline">Complete Resolution?</DialogTitle>
             <DialogDescription>
-              You are about to mark "{resolution.text}" as completed. Please provide proof for your team to verify.
+              You are about to mark "{cell.resolutionText}" as completed. You can upload proof for your team to verify.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-             <Textarea placeholder="Add a comment or a link to your proof (e.g., photo, screenshot)..." />
-             <Button variant="outline" size="sm">Upload File</Button>
+            <Textarea placeholder="Add a comment or a link to your proof (e.g., photo, screenshot)..." />
+            <Button variant="outline" size="sm">Upload File</Button>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleValidationRequest}><ThumbsUp className="mr-2 h-4 w-4" />Request Validation</Button>
+            <Button onClick={handleValidationRequest}><ThumbsUp className="mr-2 h-4 w-4" />Mark Complete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -92,21 +131,25 @@ function BingoSquare({ resolution, onUpdate }: BingoSquareProps) {
   );
 }
 
-export function BingoCard({ resolutions: initialResolutions }: { resolutions: Resolution[] }) {
-  const [resolutions, setResolutions] = useState<Resolution[]>(initialResolutions);
+interface BingoCardProps {
+  cells: BingoCell[];
+  isOwner?: boolean;
+  onCellUpdate?: (cellId: string, newState: 'to_complete' | 'completed') => void;
+}
 
-  const handleUpdateResolution = (updatedResolution: Resolution, status: Resolution['status']) => {
-    setResolutions(currentResolutions => 
-      currentResolutions.map(res => 
-        res.id === updatedResolution.id ? { ...res, status: status } : res
-      )
-    );
-  };
+export function BingoCard({ cells, isOwner = false, onCellUpdate }: BingoCardProps) {
+  // Sort cells by position
+  const sortedCells = [...cells].sort((a, b) => a.position - b.position);
 
   return (
     <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
-      {resolutions.map((res) => (
-        <BingoSquare key={res.id} resolution={res} onUpdate={handleUpdateResolution} />
+      {sortedCells.map((cell) => (
+        <BingoSquare 
+          key={cell.id} 
+          cell={cell} 
+          isOwner={isOwner}
+          onUpdate={onCellUpdate}
+        />
       ))}
     </div>
   );
