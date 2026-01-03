@@ -1,0 +1,529 @@
+/**
+ * Team Repository - Database operations for teams
+ * Spec Reference: 04-bingo-teams.md
+ */
+
+import { query, getConnection } from './connection';
+import type {
+  Team,
+  TeamMembership,
+  TeamInvitation,
+  TeamProvidedResolution,
+  TeamWithMembers,
+  TeamMemberWithProfile,
+  TeamStatus,
+} from './types';
+import { v4 as uuidv4 } from 'uuid';
+import { getPublicUserProfile } from './user-repository';
+import type { RowDataPacket } from 'mysql2/promise';
+
+// Row types from database (snake_case)
+interface TeamRow extends RowDataPacket {
+  id: string;
+  name: string;
+  leader_user_id: string;
+  team_resolution_text: string | null;
+  status: TeamStatus;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface MembershipRow extends RowDataPacket {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: 'leader' | 'member';
+  joined_at: Date;
+}
+
+interface InvitationRow extends RowDataPacket {
+  id: string;
+  team_id: string;
+  invite_code: string;
+  invited_email: string | null;
+  invited_user_id: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  expires_at: Date;
+  created_at: Date;
+}
+
+interface TeamProvidedResolutionRow extends RowDataPacket {
+  id: string;
+  team_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  text: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Convert functions
+function rowToTeam(row: TeamRow): Team {
+  return {
+    id: row.id,
+    name: row.name,
+    leaderUserId: row.leader_user_id,
+    teamResolutionText: row.team_resolution_text,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function rowToMembership(row: MembershipRow): TeamMembership {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    userId: row.user_id,
+    role: row.role,
+    joinedAt: row.joined_at,
+  };
+}
+
+function rowToInvitation(row: InvitationRow): TeamInvitation {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    inviteCode: row.invite_code,
+    invitedEmail: row.invited_email,
+    invitedUserId: row.invited_user_id,
+    status: row.status,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+  };
+}
+
+function rowToTeamProvidedResolution(row: TeamProvidedResolutionRow): TeamProvidedResolution {
+  return {
+    id: row.id,
+    teamId: row.team_id,
+    fromUserId: row.from_user_id,
+    toUserId: row.to_user_id,
+    text: row.text,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Create a new team
+ * Spec: 04-bingo-teams.md - Team Creation
+ */
+export async function createTeam(
+  name: string,
+  leaderUserId: string
+): Promise<Team> {
+  const connection = await getConnection();
+  
+  try {
+    await connection.beginTransaction();
+
+    const teamId = uuidv4();
+    const membershipId = uuidv4();
+
+    // Create team
+    await connection.execute(
+      `INSERT INTO teams (id, name, leader_user_id, status) VALUES (?, ?, ?, 'forming')`,
+      [teamId, name, leaderUserId]
+    );
+
+    // Add leader as member with 'leader' role
+    await connection.execute(
+      `INSERT INTO team_memberships (id, team_id, user_id, role) VALUES (?, ?, ?, 'leader')`,
+      [membershipId, teamId, leaderUserId]
+    );
+
+    await connection.commit();
+
+    const rows = await query<TeamRow[]>(
+      `SELECT * FROM teams WHERE id = ?`,
+      [teamId]
+    );
+
+    return rowToTeam(rows[0]);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Get team by ID
+ */
+export async function getTeamById(id: string): Promise<Team | null> {
+  const rows = await query<TeamRow[]>(
+    `SELECT * FROM teams WHERE id = ?`,
+    [id]
+  );
+  return rows.length > 0 ? rowToTeam(rows[0]) : null;
+}
+
+/**
+ * Get team with members
+ */
+export async function getTeamWithMembers(teamId: string): Promise<TeamWithMembers | null> {
+  const team = await getTeamById(teamId);
+  if (!team) return null;
+
+  const memberRows = await query<MembershipRow[]>(
+    `SELECT * FROM team_memberships WHERE team_id = ? ORDER BY joined_at ASC`,
+    [teamId]
+  );
+
+  const members: TeamMemberWithProfile[] = [];
+  for (const row of memberRows) {
+    const profile = await getPublicUserProfile(row.user_id);
+    if (profile) {
+      members.push({
+        membership: rowToMembership(row),
+        user: profile,
+      });
+    }
+  }
+
+  return {
+    ...team,
+    members,
+  };
+}
+
+/**
+ * Get teams for a user
+ */
+export async function getTeamsForUser(userId: string): Promise<Team[]> {
+  const rows = await query<TeamRow[]>(
+    `SELECT t.* FROM teams t
+     JOIN team_memberships m ON t.id = m.team_id
+     WHERE m.user_id = ?
+     ORDER BY t.created_at DESC`,
+    [userId]
+  );
+
+  return rows.map(rowToTeam);
+}
+
+/**
+ * Check if user is team member
+ */
+export async function isTeamMember(teamId: string, userId: string): Promise<boolean> {
+  const rows = await query<MembershipRow[]>(
+    `SELECT * FROM team_memberships WHERE team_id = ? AND user_id = ?`,
+    [teamId, userId]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Check if user is team leader
+ * Spec: 04-bingo-teams.md - Permissions
+ */
+export async function isTeamLeader(teamId: string, userId: string): Promise<boolean> {
+  const rows = await query<MembershipRow[]>(
+    `SELECT * FROM team_memberships WHERE team_id = ? AND user_id = ? AND role = 'leader'`,
+    [teamId, userId]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Set team resolution (joker)
+ * Spec: 04-bingo-teams.md - Team Resolution
+ */
+export async function setTeamResolution(
+  teamId: string,
+  leaderUserId: string,
+  resolutionText: string
+): Promise<Team | null> {
+  // Only team leader can set the team resolution
+  const isLeader = await isTeamLeader(teamId, leaderUserId);
+  if (!isLeader) {
+    return null;
+  }
+
+  await query(
+    `UPDATE teams SET team_resolution_text = ? WHERE id = ?`,
+    [resolutionText.trim(), teamId]
+  );
+
+  return getTeamById(teamId);
+}
+
+/**
+ * Create team invitation
+ * Spec: 04-bingo-teams.md - Invitations / Joining
+ */
+export async function createTeamInvitation(
+  teamId: string,
+  leaderUserId: string,
+  invitedEmail?: string
+): Promise<TeamInvitation | null> {
+  // Only team leader can invite
+  const isLeader = await isTeamLeader(teamId, leaderUserId);
+  if (!isLeader) {
+    return null;
+  }
+
+  const id = uuidv4();
+  const inviteCode = uuidv4();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await query(
+    `INSERT INTO team_invitations (id, team_id, invite_code, invited_email, expires_at) VALUES (?, ?, ?, ?, ?)`,
+    [id, teamId, inviteCode, invitedEmail || null, expiresAt]
+  );
+
+  const rows = await query<InvitationRow[]>(
+    `SELECT * FROM team_invitations WHERE id = ?`,
+    [id]
+  );
+
+  return rowToInvitation(rows[0]);
+}
+
+/**
+ * Join team using invite code
+ * Spec: 04-bingo-teams.md - Invitations / Joining
+ */
+export async function joinTeamByInviteCode(
+  inviteCode: string,
+  userId: string
+): Promise<{ success: boolean; team?: Team; error?: string }> {
+  const connection = await getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // Find valid invitation
+    const [invitationRows] = await connection.execute<InvitationRow[]>(
+      `SELECT * FROM team_invitations 
+       WHERE invite_code = ? AND status = 'pending' AND expires_at > NOW()`,
+      [inviteCode]
+    );
+
+    const invitations = invitationRows as InvitationRow[];
+    if (invitations.length === 0) {
+      await connection.rollback();
+      return { success: false, error: 'Invalid or expired invitation' };
+    }
+
+    const invitation = invitations[0];
+
+    // Check if already a member
+    const [memberRows] = await connection.execute<MembershipRow[]>(
+      `SELECT * FROM team_memberships WHERE team_id = ? AND user_id = ?`,
+      [invitation.team_id, userId]
+    );
+
+    if ((memberRows as MembershipRow[]).length > 0) {
+      await connection.rollback();
+      return { success: false, error: 'Already a member of this team' };
+    }
+
+    // Add as member
+    const membershipId = uuidv4();
+    await connection.execute(
+      `INSERT INTO team_memberships (id, team_id, user_id, role) VALUES (?, ?, ?, 'member')`,
+      [membershipId, invitation.team_id, userId]
+    );
+
+    // Mark invitation as accepted
+    await connection.execute(
+      `UPDATE team_invitations SET status = 'accepted', invited_user_id = ? WHERE id = ?`,
+      [userId, invitation.id]
+    );
+
+    await connection.commit();
+
+    const team = await getTeamById(invitation.team_id);
+    return { success: true, team: team || undefined };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * Get team members
+ */
+export async function getTeamMembers(teamId: string): Promise<TeamMembership[]> {
+  const rows = await query<MembershipRow[]>(
+    `SELECT * FROM team_memberships WHERE team_id = ? ORDER BY joined_at ASC`,
+    [teamId]
+  );
+  return rows.map(rowToMembership);
+}
+
+/**
+ * Create a team-provided resolution (member to member)
+ * Spec: 04-bingo-teams.md - Member-Provided Resolutions
+ */
+export async function createTeamProvidedResolution(
+  teamId: string,
+  fromUserId: string,
+  toUserId: string,
+  text: string
+): Promise<TeamProvidedResolution | null> {
+  // Verify both users are team members
+  const fromIsMember = await isTeamMember(teamId, fromUserId);
+  const toIsMember = await isTeamMember(teamId, toUserId);
+
+  if (!fromIsMember || !toIsMember) {
+    return null;
+  }
+
+  // Cannot create resolution for yourself
+  // Spec: 04-bingo-teams.md - A member cannot create a "for myself" entry
+  if (fromUserId === toUserId) {
+    return null;
+  }
+
+  const id = uuidv4();
+  const trimmedText = text.trim();
+
+  // Use ON DUPLICATE KEY UPDATE to allow updating existing resolutions
+  await query(
+    `INSERT INTO team_provided_resolutions (id, team_id, from_user_id, to_user_id, text)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE text = ?, updated_at = NOW()`,
+    [id, teamId, fromUserId, toUserId, trimmedText, trimmedText]
+  );
+
+  const rows = await query<TeamProvidedResolutionRow[]>(
+    `SELECT * FROM team_provided_resolutions WHERE team_id = ? AND from_user_id = ? AND to_user_id = ?`,
+    [teamId, fromUserId, toUserId]
+  );
+
+  return rowToTeamProvidedResolution(rows[0]);
+}
+
+/**
+ * Get team-provided resolutions for a user (resolutions others made for them)
+ */
+export async function getTeamProvidedResolutionsForUser(
+  teamId: string,
+  toUserId: string
+): Promise<TeamProvidedResolution[]> {
+  const rows = await query<TeamProvidedResolutionRow[]>(
+    `SELECT * FROM team_provided_resolutions WHERE team_id = ? AND to_user_id = ?`,
+    [teamId, toUserId]
+  );
+  return rows.map(rowToTeamProvidedResolution);
+}
+
+/**
+ * Get team-provided resolutions by a user (resolutions they made for others)
+ */
+export async function getTeamProvidedResolutionsByUser(
+  teamId: string,
+  fromUserId: string
+): Promise<TeamProvidedResolution[]> {
+  const rows = await query<TeamProvidedResolutionRow[]>(
+    `SELECT * FROM team_provided_resolutions WHERE team_id = ? AND from_user_id = ?`,
+    [teamId, fromUserId]
+  );
+  return rows.map(rowToTeamProvidedResolution);
+}
+
+/**
+ * Check if all required resolutions are provided
+ * Spec: 04-bingo-teams.md - Start Conditions
+ */
+export async function checkAllResolutionsProvided(teamId: string): Promise<{
+  ready: boolean;
+  missing: { fromUserId: string; toUserId: string }[];
+}> {
+  // Get all team members
+  const members = await getTeamMembers(teamId);
+  const memberIds = members.map(m => m.userId);
+
+  if (memberIds.length < 2) {
+    return { ready: false, missing: [] };
+  }
+
+  // Get all provided resolutions
+  const providedRows = await query<{ from_user_id: string; to_user_id: string }[]>(
+    `SELECT from_user_id, to_user_id FROM team_provided_resolutions WHERE team_id = ?`,
+    [teamId]
+  );
+
+  const providedSet = new Set(
+    providedRows.map(r => `${r.from_user_id}->${r.to_user_id}`)
+  );
+
+  // Check each pair
+  const missing: { fromUserId: string; toUserId: string }[] = [];
+
+  for (const fromId of memberIds) {
+    for (const toId of memberIds) {
+      if (fromId !== toId) {
+        const key = `${fromId}->${toId}`;
+        if (!providedSet.has(key)) {
+          missing.push({ fromUserId: fromId, toUserId: toId });
+        }
+      }
+    }
+  }
+
+  return {
+    ready: missing.length === 0,
+    missing,
+  };
+}
+
+/**
+ * Start the bingo game
+ * Spec: 04-bingo-teams.md - Start Conditions
+ */
+export async function startBingoGame(
+  teamId: string,
+  leaderUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  // Only team leader can start
+  const isLeader = await isTeamLeader(teamId, leaderUserId);
+  if (!isLeader) {
+    return { success: false, error: 'Only the team leader can start the game' };
+  }
+
+  // Check if team is still in forming status
+  const team = await getTeamById(teamId);
+  if (!team || team.status !== 'forming') {
+    return { success: false, error: 'Team is not in forming status' };
+  }
+
+  // Check if team resolution is set
+  if (!team.teamResolutionText) {
+    return { success: false, error: 'Team resolution must be set before starting' };
+  }
+
+  // Check if all resolutions are provided
+  const { ready, missing } = await checkAllResolutionsProvided(teamId);
+  if (!ready) {
+    return {
+      success: false,
+      error: `Not all members have provided resolutions for all other members. Missing: ${missing.length} resolutions`,
+    };
+  }
+
+  // Update team status
+  await query(
+    `UPDATE teams SET status = 'started' WHERE id = ?`,
+    [teamId]
+  );
+
+  return { success: true };
+}
+
+/**
+ * Get team invitation by code
+ */
+export async function getInvitationByCode(inviteCode: string): Promise<TeamInvitation | null> {
+  const rows = await query<InvitationRow[]>(
+    `SELECT * FROM team_invitations WHERE invite_code = ?`,
+    [inviteCode]
+  );
+  return rows.length > 0 ? rowToInvitation(rows[0]) : null;
+}
