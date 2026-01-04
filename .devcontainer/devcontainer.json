@@ -1,0 +1,29 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/typescript-node
+{
+	"name": "Node.js & TypeScript",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+
+	// Allow running Docker commands from inside this devcontainer by using the
+	// host's Docker daemon via /var/run/docker.sock.
+	"features": {
+		"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+	},
+	"mounts": [
+		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+	],
+	"runArgs": [
+		"--add-host=host.docker.internal:host-gateway"
+	],
+	"postCreateCommand": "set -euo pipefail; if command -v docker >/dev/null 2>&1; then echo 'docker: OK'; fi; if docker compose version >/dev/null 2>&1; then echo 'docker compose: OK'; fi; if ! command -v docker-compose >/dev/null 2>&1; then sudo tee /usr/local/bin/docker-compose >/dev/null <<'EOF'\n#!/usr/bin/env sh\nexec docker compose \"$@\"\nEOF\n; sudo chmod +x /usr/local/bin/docker-compose; fi"
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// Configure tool-specific properties.
+	// "customizations": {},
+
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

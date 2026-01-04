@@ -1,0 +1,88 @@
+services:
+  mariadb:
+    build:
+      context: .
+      dockerfile: Dockerfile.mariadb
+    image: studio-mariadb:local
+    container_name: studio-mariadb
+    environment:
+      MARIADB_DATABASE: resolution_bingo
+      MARIADB_USER: studio
+      MARIADB_PASSWORD: studio
+      MARIADB_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-setup:
+    image: node:20-bookworm
+    container_name: studio-db-setup
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - db_setup_node_modules:/app/node_modules
+    environment:
+      NODE_ENV: development
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_NAME: resolution_bingo
+      DB_USER: studio
+      DB_PASSWORD: studio
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    profiles: ["setup"]
+    restart: "no"
+    command: >
+      sh -lc "npm install && npm run db:setup"
+
+  # backend:
+  #   image: node:20-bookworm
+  #   container_name: studio-backend
+  #   working_dir: /app
+  #   volumes:
+  #     - ./:/app
+  #     - backend_node_modules:/app/node_modules
+  #   environment:
+  #     NODE_ENV: development
+  #     DB_HOST: mariadb
+  #     DB_PORT: "3306"
+  #     DB_NAME: resolution_bingo
+  #     DB_USER: studio
+  #     DB_PASSWORD: studio
+  #   depends_on:
+  #     mariadb:
+  #       condition: service_healthy
+  #   command: >
+  #     sh -lc "npm install && npm run db:setup && npx next dev --turbopack -p 9003"
+  #   ports:
+  #     - "9003:9003"
+
+  # frontend:
+  #   image: node:20-bookworm
+  #   container_name: studio-frontend
+  #   working_dir: /app
+  #   volumes:
+  #     - ./:/app
+  #     - frontend_node_modules:/app/node_modules
+  #   environment:
+  #     NODE_ENV: development
+  #     BACKEND_URL: http://backend:9003
+  #   depends_on:
+  #     - backend
+  #   command: >
+  #     sh -lc "npm install && npx next dev --turbopack -p 9002"
+  #   ports:
+  #     - "9002:9002"
+
+volumes:
+  mariadb_data:
+  db_setup_node_modules:
+  # backend_node_modules:
+  # frontend_node_modules:

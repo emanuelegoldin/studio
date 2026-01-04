@@ -440,8 +440,11 @@ export async function checkAllResolutionsProvided(teamId: string): Promise<{
   const members = await getTeamMembers(teamId);
   const memberIds = members.map(m => m.userId);
 
+  // If there are fewer than 2 members, there are no (from -> to) pairs required.
+  // Spec: 04-bingo-teams.md - all members have provided a resolution for every other member.
+  // For a 1-person team, that condition is vacuously satisfied.
   if (memberIds.length < 2) {
-    return { ready: false, missing: [] };
+    return { ready: true, missing: [] };
   }
 
   // Get all provided resolutions

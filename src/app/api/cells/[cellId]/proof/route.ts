@@ -5,6 +5,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { 
   uploadProof, 
   getProofsForCell, 
@@ -12,6 +15,36 @@ import {
   getProofById,
 } from '@/lib/db';
 import type { ReviewDecision } from '@/lib/db/types';
+
+const MAX_PROOF_FILE_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_MIME_TYPES = new Set<string>([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+]);
+
+function getSafeExtension(file: File): string | null {
+  // Prefer MIME type, fallback to original filename.
+  switch (file.type) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+    case 'application/pdf':
+      return 'pdf';
+    default: {
+      const name = file.name || '';
+      const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+      if (['jpg', 'jpeg', 'png', 'webp', 'pdf'].includes(ext)) {
+        return ext === 'jpeg' ? 'jpg' : ext;
+      }
+      return null;
+    }
+  }
+}
 
 /**
  * GET /api/cells/[cellId]/proof - Get proofs for a cell
@@ -63,8 +96,57 @@ export async function POST(
     }
 
     const { cellId } = await params;
-    const body = await request.json();
-    const { fileUrl, comment } = body;
+    const contentType = request.headers.get('content-type') || '';
+
+    let fileUrl: string | undefined;
+    let comment: string | undefined;
+
+    if (contentType.includes('multipart/form-data')) {
+      const form = await request.formData();
+      const formComment = form.get('comment');
+      comment = typeof formComment === 'string' ? formComment : undefined;
+
+      const file = form.get('file');
+      if (file instanceof File) {
+        const ext = getSafeExtension(file);
+        if (!ext) {
+          return NextResponse.json(
+            { error: 'Unsupported file type' },
+            { status: 400 }
+          );
+        }
+
+        // If file.type is available, enforce it.
+        if (file.type && !ALLOWED_MIME_TYPES.has(file.type)) {
+          return NextResponse.json(
+            { error: 'Unsupported file type' },
+            { status: 400 }
+          );
+        }
+
+        if (file.size > MAX_PROOF_FILE_BYTES) {
+          return NextResponse.json(
+            { error: 'File too large (max 5MB)' },
+            { status: 400 }
+          );
+        }
+
+        const bytes = Buffer.from(await file.arrayBuffer());
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'proofs');
+        await mkdir(uploadDir, { recursive: true });
+
+        const filename = `${randomUUID()}.${ext}`;
+        await writeFile(path.join(uploadDir, filename), bytes);
+        fileUrl = `/uploads/proofs/${filename}`;
+      } else {
+        const formFileUrl = form.get('fileUrl');
+        fileUrl = typeof formFileUrl === 'string' ? formFileUrl : undefined;
+      }
+    } else {
+      const body = await request.json();
+      fileUrl = body?.fileUrl;
+      comment = body?.comment;
+    }
 
     // Upload proof
     // Spec: 07-proof-and-approval.md - Only the card owner can upload proof

@@ -5,7 +5,7 @@
  * Spec Reference: 05-bingo-card-generation.md, 06-bingo-gameplay.md
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Star, Check, Hourglass, ThumbsUp, X } from "lucide-react";
 import { Button } from "./ui/button";
@@ -19,6 +19,7 @@ import {
 } from "./ui/dialog";
 import { Badge } from "./ui/badge";
 import { Textarea } from "./ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 interface BingoCell {
   id: string;
@@ -51,6 +52,11 @@ const stateConfig = {
 
 function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [proofComment, setProofComment] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Determine visual state based on cell state and proof status
   let visualState: keyof typeof stateConfig = cell.state;
@@ -70,11 +76,74 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
     setIsModalOpen(true);
   };
 
-  const handleValidationRequest = () => {
-    if (onUpdate) {
-      onUpdate(cell.id, 'completed');
+  useEffect(() => {
+    if (!isModalOpen) {
+      setProofComment("");
+      setSelectedFile(null);
+      setIsSubmitting(false);
     }
-    setIsModalOpen(false);
+  }, [isModalOpen]);
+
+  const handleUploadClick = () => {
+    if (isSubmitting) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+  };
+
+  const handleValidationRequest = async () => {
+    if (!onUpdate) return;
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const trimmedComment = proofComment.trim();
+      const shouldSubmitProof = Boolean(selectedFile) || trimmedComment.length > 0;
+
+      if (shouldSubmitProof) {
+        const url = `/api/cells/${cell.id}/proof`;
+
+        let response: Response;
+        if (selectedFile) {
+          const form = new FormData();
+          form.set('file', selectedFile);
+          if (trimmedComment.length > 0) {
+            form.set('comment', trimmedComment);
+          }
+          response = await fetch(url, { method: 'POST', body: form });
+        } else {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ comment: trimmedComment }),
+          });
+        }
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          toast({
+            title: 'Error',
+            description: data?.error || 'Failed to upload proof',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
+      onUpdate(cell.id, 'completed');
+      setIsModalOpen(false);
+    } catch (_error) {
+      toast({
+        title: 'Error',
+        description: 'An error occurred while uploading proof',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -118,12 +187,38 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <Textarea placeholder="Add a comment or a link to your proof (e.g., photo, screenshot)..." />
-            <Button variant="outline" size="sm">Upload File</Button>
+            <Textarea
+              placeholder="Add a comment or a link to your proof (e.g., photo, screenshot)..."
+              value={proofComment}
+              onChange={(e) => setProofComment(e.target.value)}
+              disabled={isSubmitting}
+            />
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf"
+              onChange={handleFileChange}
+              disabled={isSubmitting}
+            />
+
+            <div className="flex items-center justify-between gap-3">
+              <Button variant="outline" size="sm" onClick={handleUploadClick} disabled={isSubmitting}>
+                Upload File
+              </Button>
+              {selectedFile ? (
+                <p className="text-xs text-muted-foreground truncate">{selectedFile.name}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">No file selected</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleValidationRequest}><ThumbsUp className="mr-2 h-4 w-4" />Mark Complete</Button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button onClick={handleValidationRequest} disabled={isSubmitting}>
+              <ThumbsUp className="mr-2 h-4 w-4" />Mark Complete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
