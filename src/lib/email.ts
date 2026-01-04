@@ -7,8 +7,11 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
+// Default SMTP provider for this application
+const DEFAULT_SMTP_HOST = 'smtp.soho.com';
+
 // Email configuration from environment variables
-const SMTP_HOST = process.env.SMTP_HOST || 'smtp.soho.com';
+const SMTP_HOST = process.env.SMTP_HOST || DEFAULT_SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE === 'true'; // Use TLS
 const SMTP_USER = process.env.SMTP_USER || '';
@@ -63,7 +66,7 @@ export async function sendVerificationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   // Check if email is configured
   if (!isEmailConfigured()) {
-    console.warn('[Email Service] SMTP not configured. Skipping email send.');
+    console.log('[Email Service] SMTP not configured. Email will not be sent in development mode.');
     return { 
       success: false, 
       error: 'Email service not configured' 
