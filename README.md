@@ -1,5 +1,9 @@
 # Firebase Studio
 
-This is a NextJS starter in Firebase Studio.
+To start the application (development)
 
-To get started, take a look at src/app/page.tsx.
+```bash
+docker-compose up --build   # Starts MariaDB
+# In the project root folder
+npm run dev
+```
