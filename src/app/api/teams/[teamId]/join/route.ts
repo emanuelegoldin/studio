@@ -4,12 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isUserVerified } from '@/lib/auth';
 import { joinTeamByInviteCode, getTeamWithMembers } from '@/lib/db';
 
 /**
  * POST /api/teams/[teamId]/join - Join a team using invite code
  * Spec: 04-bingo-teams.md - Invited users can accept/join the team
+ * Requires email verification
  */
 export async function POST(
   request: NextRequest,
@@ -22,6 +23,15 @@ export async function POST(
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Check if user has verified their email
+    // Unverified users can only write resolutions and update their profiles
+    if (!isUserVerified(currentUser)) {
+      return NextResponse.json(
+        { error: 'Email verification required. Please verify your email before joining a team.' },
+        { status: 403 }
       );
     }
 
