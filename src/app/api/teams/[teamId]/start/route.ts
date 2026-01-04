@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isUserVerified } from '@/lib/auth';
 import { 
   startBingoGame, 
   isTeamLeader,
@@ -15,6 +15,7 @@ import { generateBingoCardsForTeam } from '@/lib/db/bingo-card-repository';
 /**
  * POST /api/teams/[teamId]/start - Start the bingo game
  * Spec: 04-bingo-teams.md - Team leader can start bingo once all members created resolutions
+ * Requires email verification
  */
 export async function POST(
   _request: NextRequest,
@@ -27,6 +28,15 @@ export async function POST(
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Check if user has verified their email
+    // Unverified users can only write resolutions and update their profiles
+    if (!isUserVerified(currentUser)) {
+      return NextResponse.json(
+        { error: 'Email verification required. Please verify your email before starting a game.' },
+        { status: 403 }
       );
     }
 

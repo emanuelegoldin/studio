@@ -9,6 +9,7 @@ import {
   checkUserExists, 
   createVerificationToken 
 } from '@/lib/db';
+import { sendVerificationEmail, isEmailConfigured } from '@/lib/email';
 
 // Password policy: minimum 8 characters
 // Spec: 01-authentication.md - password meets minimum security policy
@@ -69,11 +70,24 @@ export async function POST(request: NextRequest) {
     // Spec: 01-authentication.md - System sends a verification email
     const verificationToken = await createVerificationToken(user.id);
 
-    // In production, send email here with the verification link
-    // The token would be included in an email link like: /verify?token=xxx
-    // For development, the token is logged to console only
-    if (process.env.NODE_ENV !== 'production') {
+    // Send verification email
+    // In production and when SMTP is configured, send actual email
+    // For development without SMTP config, log to console only
+    if (isEmailConfigured()) {
+      const emailResult = await sendVerificationEmail(
+        email,
+        username,
+        verificationToken.token
+      );
+      
+      if (!emailResult.success) {
+        console.error('Failed to send verification email:', emailResult.error);
+        // Continue even if email fails - user can resend later
+      }
+    } else {
+      // Development mode without SMTP - log token to console
       console.log(`[DEV] Verification token for ${email}: ${verificationToken.token}`);
+      console.log(`[DEV] Verification URL: ${process.env.APP_BASE_URL || 'http://localhost:9002'}/verify?token=${verificationToken.token}`);
     }
 
     const response: { message: string; userId: string; verificationToken?: string } = {
@@ -81,8 +95,8 @@ export async function POST(request: NextRequest) {
       userId: user.id,
     };
 
-    // Only include token in development for testing purposes
-    if (process.env.NODE_ENV !== 'production') {
+    // Only include token in development for testing purposes (when email not configured)
+    if (process.env.NODE_ENV !== 'production' && !isEmailConfigured()) {
       response.verificationToken = verificationToken.token;
     }
 

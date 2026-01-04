@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isUserVerified } from '@/lib/auth';
 import { 
   createTeam, 
   getTeamsForUser, 
@@ -49,6 +49,7 @@ export async function GET() {
 /**
  * POST /api/teams - Create a new team
  * Spec: 04-bingo-teams.md - A user can create a team and becomes team leader
+ * Requires email verification
  */
 export async function POST(request: NextRequest) {
   try {
@@ -58,6 +59,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Check if user has verified their email
+    // Unverified users can only write resolutions and update their profiles
+    if (!isUserVerified(currentUser)) {
+      return NextResponse.json(
+        { error: 'Email verification required. Please verify your email before creating a team.' },
+        { status: 403 }
       );
     }
 

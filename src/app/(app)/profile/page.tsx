@@ -37,6 +37,7 @@ function ProfileForm() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -109,6 +110,38 @@ function ProfileForm() {
     }
   };
 
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const response = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: data.message || "Verification email sent successfully",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to resend verification email",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -133,6 +166,30 @@ function ProfileForm() {
           <div>
             <p className="font-medium">{user?.username}</p>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
+            {user?.emailVerified ? (
+              <p className="text-sm text-green-600 font-medium mt-1">✓ Email Verified</p>
+            ) : (
+              <div className="mt-1">
+                <p className="text-sm text-amber-600 font-medium">⚠ Email Not Verified</p>
+                <p className="text-xs text-muted-foreground">You need to verify your email to create or join teams.</p>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="h-auto p-0 text-xs mt-1"
+                  onClick={handleResendVerification}
+                  disabled={isResendingVerification}
+                >
+                  {isResendingVerification ? (
+                    <>
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Resend Verification Email'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
         <Separator />
