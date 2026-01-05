@@ -167,18 +167,9 @@ async function generateCardForUser(
   }[] = [];
 
   const usedTexts = new Set<string>();
-
-  // Add team resolution as a completable cell (highest priority)
-  cellData.push({
-    text: teamResolutionText,
-    sourceType: 'team',
-    sourceUserId: null,
-    isJoker: false,
-    isEmpty: false,
-  });
   usedTexts.add(teamResolutionText.toLowerCase());
 
-  // Add member-provided resolutions
+  // Add member-provided resolutions (highest priority)
   // Spec: 05-bingo-card-generation.md - Step 3
   for (const res of providedResolutions) {
     if (cellData.length >= totalCells - 1) break; // Leave room for joker
@@ -193,6 +184,15 @@ async function generateCardForUser(
       usedTexts.add(res.text.toLowerCase());
     }
   }
+
+  // Add team resolution as a completable cell (second priority)
+  cellData.push({
+    text: teamResolutionText,
+    sourceType: 'team',
+    sourceUserId: null,
+    isJoker: false,
+    isEmpty: false,
+  });
 
   // Fill remaining with personal resolutions
   // Spec: 05-bingo-card-generation.md - Step 4
