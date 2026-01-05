@@ -472,7 +472,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                 </Button>
               </>
             )}
-            {!isLeader && team.status === 'forming' && (
+            {team.status === 'forming' && (
               <Dialog open={memberResolutionsOpen} onOpenChange={setMemberResolutionsOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
