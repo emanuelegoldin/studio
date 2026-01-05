@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS bingo_cards (
 
 -- Bingo card cells
 -- Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md - BingoCellState
+-- Updated: Added pending, pending_review, accomplished states for proof workflow
 CREATE TABLE IF NOT EXISTS bingo_cells (
   id VARCHAR(36) PRIMARY KEY,
   card_id VARCHAR(36) NOT NULL,
@@ -163,7 +164,7 @@ CREATE TABLE IF NOT EXISTS bingo_cells (
   is_empty BOOLEAN DEFAULT FALSE,
   source_type ENUM('team', 'member_provided', 'personal', 'empty') NOT NULL,
   source_user_id VARCHAR(36) NULL, -- who provided this resolution
-  state ENUM('to_complete', 'completed') DEFAULT 'to_complete',
+  state ENUM('pending', 'completed', 'pending_review', 'accomplished') DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY unique_cell (card_id, position),
@@ -212,6 +213,65 @@ CREATE TABLE IF NOT EXISTS duplicate_reports (
   resolved_at DATETIME NULL,
   FOREIGN KEY (cell_id) REFERENCES bingo_cells(id) ON DELETE CASCADE,
   FOREIGN KEY (reporter_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Review threads
+-- Spec: Resolution Review & Proof Workflow - Thread Creation & Lifecycle
+CREATE TABLE IF NOT EXISTS review_threads (
+  id VARCHAR(36) PRIMARY KEY,
+  cell_id VARCHAR(36) NOT NULL,
+  completed_by_user_id VARCHAR(36) NOT NULL,
+  status ENUM('open', 'closed') DEFAULT 'open',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  closed_at DATETIME NULL,
+  FOREIGN KEY (cell_id) REFERENCES bingo_cells(id) ON DELETE CASCADE,
+  FOREIGN KEY (completed_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_cell (cell_id),
+  INDEX idx_status (status)
+);
+
+-- Review messages
+-- Spec: Resolution Review & Proof Workflow - Thread Capabilities
+CREATE TABLE IF NOT EXISTS review_messages (
+  id VARCHAR(36) PRIMARY KEY,
+  thread_id VARCHAR(36) NOT NULL,
+  author_user_id VARCHAR(36) NOT NULL,
+  content TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (thread_id) REFERENCES review_threads(id) ON DELETE CASCADE,
+  FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_thread (thread_id)
+);
+
+-- Review files
+-- Spec: Resolution Review & Proof Workflow - Thread Capabilities (max 5MB per file)
+CREATE TABLE IF NOT EXISTS review_files (
+  id VARCHAR(36) PRIMARY KEY,
+  thread_id VARCHAR(36) NOT NULL,
+  uploaded_by_user_id VARCHAR(36) NOT NULL,
+  file_path VARCHAR(512) NOT NULL,
+  file_size INT NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (thread_id) REFERENCES review_threads(id) ON DELETE CASCADE,
+  FOREIGN KEY (uploaded_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_thread (thread_id)
+);
+
+-- Review votes
+-- Spec: Resolution Review & Proof Workflow - Voting Rules
+CREATE TABLE IF NOT EXISTS review_votes (
+  id VARCHAR(36) PRIMARY KEY,
+  thread_id VARCHAR(36) NOT NULL,
+  voter_user_id VARCHAR(36) NOT NULL,
+  vote ENUM('accept', 'deny') NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_vote (thread_id, voter_user_id),
+  FOREIGN KEY (thread_id) REFERENCES review_threads(id) ON DELETE CASCADE,
+  FOREIGN KEY (voter_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_thread (thread_id)
 );
 `;
 

@@ -247,7 +247,7 @@ async function generateCardForUser(
       await connection.execute(
         `INSERT INTO bingo_cells 
          (id, card_id, position, resolution_text, is_joker, is_empty, source_type, source_user_id, state)
-         VALUES (?, ?, ?, ?, TRUE, FALSE, 'team', NULL, 'to_complete')`,
+         VALUES (?, ?, ?, ?, TRUE, FALSE, 'team', NULL, 'pending')`,
         [cellId, cardId, position, 'Joker']
       );
     } else {
@@ -258,7 +258,7 @@ async function generateCardForUser(
       await connection.execute(
         `INSERT INTO bingo_cells 
          (id, card_id, position, resolution_text, is_joker, is_empty, source_type, source_user_id, state)
-         VALUES (?, ?, ?, ?, FALSE, ?, ?, ?, 'to_complete')`,
+         VALUES (?, ?, ?, ?, FALSE, ?, ?, ?, 'pending')`,
         [cellId, cardId, position, data.text, data.isEmpty, data.sourceType, data.sourceUserId]
       );
     }
@@ -358,6 +358,7 @@ async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]>
 /**
  * Update cell state
  * Spec: 06-bingo-gameplay.md - Card State
+ * Updated: Support new states for proof workflow
  */
 export async function updateCellState(
   cellId: string,
@@ -385,13 +386,22 @@ export async function updateCellState(
   }
 
   // Spec: 06-bingo-gameplay.md - "empty" filler cells cannot be marked completed
-  if (cell.is_empty && newState === 'completed') {
+  if (cell.is_empty && (newState === 'completed' || newState === 'accomplished')) {
     return { success: false, error: 'Empty cells cannot be marked as completed' };
   }
 
   // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
   if (cell.is_joker) {
     return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
+  // Validate state transitions
+  // pending -> completed (user marks as done)
+  // completed -> pending (user undoes)
+  // pending_review can only be changed by voting system, not directly
+  // accomplished is final (can only be reset to pending via undo)
+  if (newState === 'pending_review') {
+    return { success: false, error: 'Cannot directly set pending_review state' };
   }
 
   // Update the state
@@ -406,6 +416,92 @@ export async function updateCellState(
   );
 
   return { success: true, cell: rowToCell(updatedRows[0]) };
+}
+
+/**
+ * Undo completion - revert cell to pending and close any open thread
+ * Spec: Resolution Review & Proof Workflow - Undo Completion
+ */
+export async function undoCompletion(
+  cellId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+  const cellRows = await query<(CellRow & { card_user_id: string })[]>(
+    `SELECT c.*, bc.user_id as card_user_id
+     FROM bingo_cells c
+     JOIN bingo_cards bc ON c.card_id = bc.id
+     WHERE c.id = ?`,
+    [cellId]
+  );
+
+  if (cellRows.length === 0) {
+    return { success: false, error: 'Cell not found' };
+  }
+
+  const cell = cellRows[0];
+
+  // Only the card owner can undo completion
+  if (cell.card_user_id !== userId) {
+    return { success: false, error: 'Only the card owner can undo completion' };
+  }
+
+  // Must be in completed, pending_review, or accomplished state
+  if (!['completed', 'pending_review', 'accomplished'].includes(cell.state)) {
+    return { success: false, error: 'Cell is not completed' };
+  }
+
+  const connection = await getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // Check for open review thread
+    const [threadRows] = await connection.execute<{ id: string; status: string }[]>(
+      `SELECT id, status FROM review_threads WHERE cell_id = ? AND status = 'open'`,
+      [cellId]
+    );
+
+    if (threadRows.length > 0) {
+      const threadId = threadRows[0].id;
+
+      // Delete messages and files
+      await connection.execute(
+        `DELETE FROM review_messages WHERE thread_id = ?`,
+        [threadId]
+      );
+
+      await connection.execute(
+        `DELETE FROM review_files WHERE thread_id = ?`,
+        [threadId]
+      );
+
+      // Close the thread
+      await connection.execute(
+        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
+        [threadId]
+      );
+    }
+
+    // Update cell state to pending
+    await connection.execute(
+      `UPDATE bingo_cells SET state = 'pending' WHERE id = ?`,
+      [cellId]
+    );
+
+    await connection.commit();
+
+    const updatedRows = await query<CellRow[]>(
+      `SELECT * FROM bingo_cells WHERE id = ?`,
+      [cellId]
+    );
+
+    return { success: true, cell: rowToCell(updatedRows[0]) };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 /**

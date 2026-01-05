@@ -145,8 +145,8 @@ export interface BingoCard {
 export type CellSourceType = 'team' | 'member_provided' | 'personal' | 'empty';
 
 // Cell state
-// Spec: 06-bingo-gameplay.md, AGENTS.md
-export type CellState = 'to_complete' | 'completed';
+// Spec: 06-bingo-gameplay.md, Resolution Review & Proof Workflow
+export type CellState = 'pending' | 'completed' | 'pending_review' | 'accomplished';
 
 // Bingo cell
 // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md
@@ -228,4 +228,58 @@ export interface BingoCardWithCells extends BingoCard {
 
 export interface BingoCellWithProof extends BingoCell {
   proof: CellProof | null;
+}
+
+// Review thread types
+// Spec: Resolution Review & Proof Workflow
+
+export type ThreadStatus = 'open' | 'closed';
+
+export interface ReviewThread {
+  id: string;
+  cellId: string;
+  completedByUserId: string;
+  status: ThreadStatus;
+  createdAt: Date;
+  closedAt: Date | null;
+}
+
+export interface ReviewMessage {
+  id: string;
+  threadId: string;
+  authorUserId: string;
+  content: string;
+  createdAt: Date;
+}
+
+export interface ReviewFile {
+  id: string;
+  threadId: string;
+  uploadedByUserId: string;
+  filePath: string;
+  fileSize: number;
+  fileName: string;
+  mimeType: string | null;
+  createdAt: Date;
+}
+
+export type VoteType = 'accept' | 'deny';
+
+export interface ReviewVote {
+  id: string;
+  threadId: string;
+  voterUserId: string;
+  vote: VoteType;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Extended types for API responses
+
+export interface ReviewThreadWithDetails extends ReviewThread {
+  messages: ReviewMessage[];
+  files: ReviewFile[];
+  votes: ReviewVote[];
+  cellResolutionText: string;
+  teamId: string;
 }

@@ -48,7 +48,8 @@ export async function GET(
 
 /**
  * PUT /api/cells/[cellId] - Update cell state
- * Spec: 06-bingo-gameplay.md - Toggle between to_complete and completed
+ * Spec: 06-bingo-gameplay.md - Toggle between pending and completed
+ * Updated: Support new states for proof workflow
  */
 export async function PUT(
   request: NextRequest,
@@ -68,10 +69,11 @@ export async function PUT(
     const body = await request.json();
     const { state } = body;
 
-    // Validate state
-    if (!state || !['to_complete', 'completed'].includes(state)) {
+    // Validate state - only pending, completed, and accomplished allowed for direct updates
+    const validStates = ['pending', 'completed', 'accomplished'];
+    if (!state || !validStates.includes(state)) {
       return NextResponse.json(
-        { error: 'Invalid state. Must be "to_complete" or "completed"' },
+        { error: 'Invalid state. Must be "pending", "completed", or "accomplished"' },
         { status: 400 }
       );
     }

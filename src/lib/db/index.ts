@@ -18,3 +18,4 @@ export * from './resolution-repository';
 export * from './team-repository';
 export * from './bingo-card-repository';
 export * from './proof-repository';
+export * from './review-thread-repository';
