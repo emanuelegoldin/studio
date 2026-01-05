@@ -449,7 +449,8 @@ export async function submitVote(
     let threadClosed = false;
 
     // If all eligible voters have voted, close the thread
-    if (totalVotes >= eligibleVoters) {
+    // Note: Handle edge case where there are no eligible voters (single-member team)
+    if (eligibleVoters > 0 && totalVotes >= eligibleVoters) {
       // Count accept votes
       const acceptVotes = allVoteRows.filter((v: VoteRow) => v.vote === 'accept').length;
       const acceptPercentage = acceptVotes / totalVotes;

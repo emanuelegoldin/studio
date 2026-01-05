@@ -235,7 +235,7 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
 interface BingoCardProps {
   cells: BingoCell[];
   isOwner?: boolean;
-  onCellUpdate?: (cellId: string, newState: 'to_complete' | 'completed') => void;
+  onCellUpdate?: (cellId: string, newState: 'pending' | 'completed') => void;
 }
 
 export function BingoCard({ cells, isOwner = false, onCellUpdate }: BingoCardProps) {

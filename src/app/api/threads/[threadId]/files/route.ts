@@ -40,7 +40,9 @@ function getSafeExtension(file: File): string | null {
       return 'mov';
     default: {
       const name = file.name || '';
-      const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
+      if (!name.includes('.')) return null;
+      const parts = name.split('.');
+      const ext = parts.length > 0 ? parts[parts.length - 1].toLowerCase() : '';
       if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'mp4', 'mov'].includes(ext)) {
         return ext === 'jpeg' ? 'jpg' : ext;
       }
