@@ -30,7 +30,7 @@ interface BingoCell {
   isEmpty: boolean;
   sourceType: string;
   sourceUserId: string | null;
-  state: 'to_complete' | 'completed';
+  state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
   proof: {
     id: string;
     status: 'pending' | 'approved' | 'declined';
@@ -40,13 +40,14 @@ interface BingoCell {
 interface BingoSquareProps {
   cell: BingoCell;
   isOwner: boolean;
-  onUpdate?: (cellId: string, newState: 'to_complete' | 'completed') => void;
+  onUpdate?: (cellId: string, newState: 'pending' | 'completed') => void;
 }
 
 const stateConfig = {
-  to_complete: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
-  pending: { icon: <Hourglass className="h-4 w-4 text-amber-500" />, color: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-800 dark:text-amber-300" },
-  completed: { icon: <Check className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300 line-through" },
+  pending: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
+  completed: { icon: <Check className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300" },
+  pending_review: { icon: <Hourglass className="h-4 w-4 text-amber-500" />, color: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-800 dark:text-amber-300" },
+  accomplished: { icon: <ThumbsUp className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300 line-through" },
   declined: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
 };
 
@@ -61,15 +62,15 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
   // Determine visual state based on cell state and proof status
   let visualState: keyof typeof stateConfig = cell.state;
   if (cell.proof) {
-    if (cell.proof.status === 'pending') visualState = 'pending';
+    if (cell.proof.status === 'pending') visualState = 'pending_review';
     else if (cell.proof.status === 'declined') visualState = 'declined';
   }
   
-  const config = stateConfig[visualState] || stateConfig.to_complete;
+  const config = stateConfig[visualState] || stateConfig.pending;
   
   // Spec: 06-bingo-gameplay.md - Empty cells cannot be marked as completed
   // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
-  const canInteract = isOwner && !cell.isJoker && !cell.isEmpty && cell.state === 'to_complete';
+  const canInteract = isOwner && !cell.isJoker && !cell.isEmpty && cell.state === 'pending';
 
   const handleClick = () => {
     if (!canInteract) return;
@@ -164,7 +165,7 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
           {cell.resolutionText}
         </p>
         <div className="absolute top-1 right-1">
-          {visualState !== 'to_complete' && !cell.isJoker && config.icon}
+          {visualState !== 'pending' && !cell.isJoker && config.icon}
         </div>
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'team' && (
           <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">

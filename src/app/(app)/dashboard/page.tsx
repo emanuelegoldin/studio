@@ -22,7 +22,7 @@ interface BingoCell {
   isEmpty: boolean;
   sourceType: string;
   sourceUserId: string | null;
-  state: 'to_complete' | 'completed';
+  state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
   proof: {
     id: string;
     status: 'pending' | 'approved' | 'declined';
@@ -117,7 +117,7 @@ export default function DashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const handleCellUpdate = async (teamId: string, cellId: string, newState: 'to_complete' | 'completed') => {
+  const handleCellUpdate = async (teamId: string, cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response = await fetch(`/api/cells/${cellId}`, {
         method: 'PUT',
