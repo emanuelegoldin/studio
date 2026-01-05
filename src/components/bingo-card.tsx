@@ -161,7 +161,7 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
       >
         {cell.isJoker && <Star className="h-8 w-8 mb-1" />}
         <p className={cn("text-xs md:text-sm font-medium", config.text, cell.isJoker && "text-primary-foreground")}>
-          {cell.resolutionText}
+          {cell.isJoker ? "Joker" : cell.resolutionText}
         </p>
         <div className="absolute top-1 right-1">
           {visualState !== 'to_complete' && !cell.isJoker && config.icon}
