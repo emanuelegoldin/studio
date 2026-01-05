@@ -166,6 +166,11 @@ function BingoSquare({ cell, isOwner, onUpdate }: BingoSquareProps) {
         <div className="absolute top-1 right-1">
           {visualState !== 'to_complete' && !cell.isJoker && config.icon}
         </div>
+        {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'team' && (
+          <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
+            Team Goal
+          </Badge>
+        )}
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'member_provided' && (
           <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
             From Team

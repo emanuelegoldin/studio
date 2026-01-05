@@ -186,13 +186,15 @@ async function generateCardForUser(
   }
 
   // Add team resolution as a completable cell (second priority)
-  cellData.push({
-    text: teamResolutionText,
-    sourceType: 'team',
-    sourceUserId: null,
-    isJoker: false,
-    isEmpty: false,
-  });
+  if (cellData.length < totalCells - 1) {
+    cellData.push({
+      text: teamResolutionText,
+      sourceType: 'team',
+      sourceUserId: null,
+      isJoker: false,
+      isEmpty: false,
+    });
+  }
 
   // Fill remaining with personal resolutions
   // Spec: 05-bingo-card-generation.md - Step 4
