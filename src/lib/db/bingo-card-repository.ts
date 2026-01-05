@@ -167,6 +167,15 @@ async function generateCardForUser(
   }[] = [];
 
   const usedTexts = new Set<string>();
+
+  // Add team resolution as a completable cell (highest priority)
+  cellData.push({
+    text: teamResolutionText,
+    sourceType: 'team',
+    sourceUserId: null,
+    isJoker: false,
+    isEmpty: false,
+  });
   usedTexts.add(teamResolutionText.toLowerCase());
 
   // Add member-provided resolutions
@@ -231,13 +240,13 @@ async function generateCardForUser(
     const cellId = uuidv4();
 
     if (position === centerPosition) {
-      // Insert joker at center
-      // Spec: 05-bingo-card-generation.md - Step 2
+      // Insert joker at center - informational only, displays "Joker"
+      // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
       await connection.execute(
         `INSERT INTO bingo_cells 
          (id, card_id, position, resolution_text, is_joker, is_empty, source_type, source_user_id, state)
          VALUES (?, ?, ?, ?, TRUE, FALSE, 'team', NULL, 'to_complete')`,
-        [cellId, cardId, position, teamResolutionText]
+        [cellId, cardId, position, 'Joker']
       );
     } else {
       // Get the cell data for this position (accounting for joker)
