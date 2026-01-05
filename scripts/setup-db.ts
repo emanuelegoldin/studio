@@ -56,6 +56,28 @@ async function setupDatabase() {
     }
   }
 
+  // Apply minimal, safe migrations for existing databases.
+  // This is needed because CREATE TABLE IF NOT EXISTS will not update existing columns.
+  const migrationStatements: string[] = [
+    // 1) Expand legacy enum (to_complete/completed) to also include new states.
+    `ALTER TABLE bingo_cells MODIFY COLUMN state ENUM('to_complete', 'completed', 'pending', 'pending_review', 'accomplished') DEFAULT 'pending'`,
+    // 2) Map legacy value to the new default state.
+    `UPDATE bingo_cells SET state = 'pending' WHERE state = 'to_complete'`,
+    // 3) Finalize enum to only the new, spec-defined states.
+    `ALTER TABLE bingo_cells MODIFY COLUMN state ENUM('pending', 'completed', 'pending_review', 'accomplished') DEFAULT 'pending'`,
+  ];
+
+  for (const statement of migrationStatements) {
+    try {
+      await connection.execute(statement);
+      console.log(`✓ Migration applied: ${statement.split(' ')[0]} ${statement.split(' ')[1]}`);
+    } catch (error: unknown) {
+      // Migrations should be best-effort: they may fail if already applied.
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn(`Migration skipped/failed (may be already applied): ${errorMessage}`);
+    }
+  }
+
   await connection.end();
   console.log('\nDatabase setup complete!');
 }
