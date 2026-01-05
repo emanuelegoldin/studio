@@ -558,11 +558,5 @@ export async function deleteTeam(
     [teamId]
   );
 
-  // Verify deletion
-  const rows = await query<TeamRow[]>(
-    `SELECT * FROM teams WHERE id = ?`,
-    [teamId]
-  );
-
-  return rows.length === 0;
+  return true;
 }
