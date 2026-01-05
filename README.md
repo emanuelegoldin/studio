@@ -15,3 +15,10 @@ npm run dev
 - **bug**: an issue with an already implemented feature to be solved
 
 Before closing an issue, remember to **update the specifications accordingly** (`specs/` folder and `AGENTS.md`). Add new Markdown files if necessary.
+
+Issues labeled **question**:
+- Are considered incomplete
+- Must NOT be assigned
+- Must be clarified before work starts
+
+Only issues without the `question` label are ready for implementation.
