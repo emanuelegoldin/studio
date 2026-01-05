@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
-import { getTeamWithMembers, isTeamMember } from '@/lib/db';
+import { getTeamWithMembers, isTeamMember, deleteTeam, getTeamById } from '@/lib/db';
 
 /**
  * GET /api/teams/[teamId] - Get a specific team's details
@@ -47,6 +47,60 @@ export async function GET(
     return NextResponse.json({ team });
   } catch (error) {
     console.error('Get team error:', error);
+    return NextResponse.json(
+      { error: 'An error occurred' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/teams/[teamId] - Delete a team (leader only)
+ * Spec Reference: 04-bingo-teams.md - Team leader can manage the team
+ * 
+ * Deletes the team and all associated data (memberships, invitations, 
+ * resolutions, bingo cards) via CASCADE constraints.
+ */
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ teamId: string }> }
+) {
+  try {
+    const currentUser = await getCurrentUser();
+    
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const { teamId } = await params;
+
+    // Check if team exists
+    const team = await getTeamById(teamId);
+    if (!team) {
+      return NextResponse.json(
+        { error: 'Team not found' },
+        { status: 404 }
+      );
+    }
+
+    // Attempt to delete (will check authorization internally)
+    const deleted = await deleteTeam(teamId, currentUser.id);
+    
+    if (!deleted) {
+      return NextResponse.json(
+        { error: 'Only the team leader can delete the team' },
+        { status: 403 }
+      );
+    }
+    
+    return NextResponse.json({ 
+      message: 'Team deleted successfully' 
+    });
+  } catch (error) {
+    console.error('Delete team error:', error);
     return NextResponse.json(
       { error: 'An error occurred' },
       { status: 500 }

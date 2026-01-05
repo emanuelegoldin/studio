@@ -530,3 +530,39 @@ export async function getInvitationByCode(inviteCode: string): Promise<TeamInvit
   );
   return rows.length > 0 ? rowToInvitation(rows[0]) : null;
 }
+
+/**
+ * Delete a team
+ * Spec: 04-bingo-teams.md - Only team leader can manage the team
+ * 
+ * This is a hard delete. Due to ON DELETE CASCADE foreign keys, deleting the team
+ * will automatically delete:
+ * - Team memberships
+ * - Team invitations
+ * - Team-provided resolutions
+ * - Bingo cards (and their cells, proofs, reviews, etc.)
+ */
+export async function deleteTeam(
+  teamId: string,
+  userId: string
+): Promise<boolean> {
+  // Only team leader can delete the team
+  const isLeader = await isTeamLeader(teamId, userId);
+  if (!isLeader) {
+    return false;
+  }
+
+  // Delete the team (CASCADE will handle related data)
+  await query(
+    `DELETE FROM teams WHERE id = ?`,
+    [teamId]
+  );
+
+  // Verify deletion
+  const rows = await query<TeamRow[]>(
+    `SELECT * FROM teams WHERE id = ?`,
+    [teamId]
+  );
+
+  return rows.length === 0;
+}
