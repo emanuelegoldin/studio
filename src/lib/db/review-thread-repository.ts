@@ -451,7 +451,7 @@ export async function submitVote(
     // If all eligible voters have voted, close the thread
     if (totalVotes >= eligibleVoters) {
       // Count accept votes
-      const acceptVotes = allVoteRows.filter(v => v.vote === 'accept').length;
+      const acceptVotes = allVoteRows.filter((v: VoteRow) => v.vote === 'accept').length;
       const acceptPercentage = acceptVotes / totalVotes;
 
       // Determine new cell state based on votes
