@@ -68,6 +68,7 @@ interface BingoCell {
   sourceType: string;
   sourceUserId: string | null;
   state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
+  reviewThreadId?: string | null;
   proof: {
     id: string;
     status: 'pending' | 'approved' | 'declined';
@@ -382,11 +383,14 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
 
   const handleCellUpdate = async (cellId: string, newState: 'pending' | 'completed') => {
     try {
-      const response = await fetch(`/api/cells/${cellId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: newState }),
-      });
+      const response =
+        newState === 'pending'
+          ? await fetch(`/api/cells/${cellId}/undo-complete`, { method: 'POST' })
+          : await fetch(`/api/cells/${cellId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ state: newState }),
+            });
 
       if (response.ok) {
         // Refresh cards
@@ -419,6 +423,14 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
       </div>
     );
   }
+
+  const reloadCards = async () => {
+    const cardsRes = await fetch(`/api/teams/${teamId}/cards`);
+    const cardsData = await cardsRes.json();
+    if (cardsRes.ok) {
+      setCards(cardsData.cards || []);
+    }
+  };
 
   if (!team) {
     return (
@@ -654,6 +666,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                         cells={card.cells} 
                         isOwner={isCurrentUser}
                         onCellUpdate={isCurrentUser ? handleCellUpdate : undefined}
+                        onRefresh={reloadCards}
                       />
                     ) : (
                       <p className="text-muted-foreground text-center py-8">No bingo card available</p>

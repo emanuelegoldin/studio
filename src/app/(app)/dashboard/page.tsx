@@ -23,6 +23,7 @@ interface BingoCell {
   sourceType: string;
   sourceUserId: string | null;
   state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
+  reviewThreadId?: string | null;
   proof: {
     id: string;
     status: 'pending' | 'approved' | 'declined';
@@ -113,31 +114,38 @@ export default function DashboardPage() {
     }
   }, [toast]);
 
+  const reloadCardForTeam = useCallback(
+    async (teamId: string) => {
+      const cardsRes = await fetch(`/api/teams/${teamId}/cards?userId=${currentUserId}`);
+      const cardsData = await cardsRes.json();
+      if (cardsRes.ok && cardsData.card) {
+        setActiveCards((prev) =>
+          prev.map((item) =>
+            item.team.id === teamId ? { ...item, card: cardsData.card } : item
+          )
+        );
+      }
+    },
+    [currentUserId]
+  );
+
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
   const handleCellUpdate = async (teamId: string, cellId: string, newState: 'pending' | 'completed') => {
     try {
-      const response = await fetch(`/api/cells/${cellId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: newState }),
-      });
+      const response =
+        newState === 'pending'
+          ? await fetch(`/api/cells/${cellId}/undo-complete`, { method: 'POST' })
+          : await fetch(`/api/cells/${cellId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ state: newState }),
+            });
 
       if (response.ok) {
-        // Refresh the specific card
-        const cardsRes = await fetch(`/api/teams/${teamId}/cards?userId=${currentUserId}`);
-        const cardsData = await cardsRes.json();
-        if (cardsRes.ok && cardsData.card) {
-          setActiveCards(prev => 
-            prev.map(item => 
-              item.team.id === teamId 
-                ? { ...item, card: cardsData.card }
-                : item
-            )
-          );
-        }
+        await reloadCardForTeam(teamId);
       } else {
         const data = await response.json();
         toast({
@@ -220,6 +228,7 @@ export default function DashboardPage() {
               cells={card.cells} 
               isOwner={true}
               onCellUpdate={(cellId, newState) => handleCellUpdate(team.id, cellId, newState)}
+              onRefresh={() => reloadCardForTeam(team.id)}
             />
           </CardContent>
         </Card>

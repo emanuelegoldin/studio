@@ -13,7 +13,7 @@ import type {
   CellState,
   CellSourceType,
 } from './types';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { getTeamById, getTeamMembers, isTeamMember } from './team-repository';
 import { getTeamProvidedResolutionsForUser } from './team-repository';
 import { getRandomResolutions } from './resolution-repository';
@@ -147,11 +147,11 @@ async function generateCardForUser(
   const centerPosition = 12; // Center of 5x5 grid (0-indexed)
 
   // Create the card
-  const cardId = uuidv4();
-  await connection.execute(
-    `INSERT INTO bingo_cards (id, team_id, user_id, grid_size) VALUES (?, ?, ?, ?)`,
-    [cardId, teamId, userId, gridSize]
-  );
+    const cardId = randomUUID();
+    await connection.execute(
+      `INSERT INTO bingo_cards (id, team_id, user_id, grid_size) VALUES (?, ?, ?, ?)`,
+      [cardId, teamId, userId, gridSize]
+    );
 
   // Get member-provided resolutions for this user
   // Spec: 05-bingo-card-generation.md - Step 3
@@ -239,7 +239,7 @@ async function generateCardForUser(
 
   // Insert cells into database
   for (let position = 0; position < totalCells; position++) {
-    const cellId = uuidv4();
+    const cellId = randomUUID();
 
     if (position === centerPosition) {
       // Insert joker at center - informational only, displays "Joker"
@@ -346,9 +346,15 @@ async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]>
       [cell.id]
     );
 
+    const threadRows = await query<{ id: string }[]>(
+      `SELECT id FROM review_threads WHERE cell_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 1`,
+      [cell.id]
+    );
+
     cells.push({
       ...cell,
       proof: proofRows.length > 0 ? rowToProof(proofRows[0]) : null,
+      reviewThreadId: threadRows.length > 0 ? threadRows[0].id : null,
     });
   }
 
@@ -456,10 +462,12 @@ export async function undoCompletion(
     await connection.beginTransaction();
 
     // Check for open review thread
-    const [threadRows] = await connection.execute<{ id: string; status: string }[]>(
+    const [threadRowsUnknown] = await connection.execute(
       `SELECT id, status FROM review_threads WHERE cell_id = ? AND status = 'open'`,
       [cellId]
     );
+
+    const threadRows = threadRowsUnknown as Array<{ id: string; status: string }>;
 
     if (threadRows.length > 0) {
       const threadId = threadRows[0].id;
@@ -553,9 +561,15 @@ export async function getCellById(cellId: string): Promise<BingoCellWithProof | 
     [cell.id]
   );
 
+  const threadRows = await query<{ id: string }[]>(
+    `SELECT id FROM review_threads WHERE cell_id = ? AND status = 'open' ORDER BY created_at DESC LIMIT 1`,
+    [cell.id]
+  );
+
   return {
     ...cell,
     proof: proofRows.length > 0 ? rowToProof(proofRows[0]) : null,
+    reviewThreadId: threadRows.length > 0 ? threadRows[0].id : null,
   };
 }
 
@@ -590,12 +604,12 @@ export async function reportDuplicate(
   }
 
   // Create duplicate report
-  const reportId = uuidv4();
-  await query(
-    `INSERT INTO duplicate_reports (id, cell_id, reporter_user_id, replacement_text, status)
-     VALUES (?, ?, ?, ?, 'pending')`,
-    [reportId, cellId, reporterUserId, replacementText || null]
-  );
+    const reportId = randomUUID();
+    await query(
+      `INSERT INTO duplicate_reports (id, cell_id, reporter_user_id, replacement_text, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+      [reportId, cellId, reporterUserId, replacementText || null]
+    );
 
   // If replacement text provided, update the cell
   if (replacementText && replacementText.trim()) {

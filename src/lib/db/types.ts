@@ -228,6 +228,7 @@ export interface BingoCardWithCells extends BingoCard {
 
 export interface BingoCellWithProof extends BingoCell {
   proof: CellProof | null;
+  reviewThreadId?: string | null;
 }
 
 // Review thread types

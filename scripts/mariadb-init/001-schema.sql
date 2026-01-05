@@ -240,3 +240,18 @@ CREATE TABLE IF NOT EXISTS review_files (
   FOREIGN KEY (uploaded_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_thread (thread_id)
 );
+
+-- Review votes
+-- Spec: 07-proof-and-approval.md - Voting Rules
+CREATE TABLE IF NOT EXISTS review_votes (
+  id VARCHAR(36) PRIMARY KEY,
+  thread_id VARCHAR(36) NOT NULL,
+  voter_user_id VARCHAR(36) NOT NULL,
+  vote ENUM('accept', 'deny') NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_vote (thread_id, voter_user_id),
+  FOREIGN KEY (thread_id) REFERENCES review_threads(id) ON DELETE CASCADE,
+  FOREIGN KEY (voter_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_thread (thread_id)
+);

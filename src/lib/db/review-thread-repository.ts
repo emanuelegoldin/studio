@@ -13,7 +13,7 @@ import type {
   ThreadStatus,
   VoteType,
 } from './types';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
 
 // Row types from database
@@ -170,7 +170,7 @@ export async function requestProof(
     await connection.beginTransaction();
 
     // Create thread
-    const threadId = uuidv4();
+    const threadId = randomUUID();
     await connection.execute(
       `INSERT INTO review_threads (id, cell_id, completed_by_user_id, status)
        VALUES (?, ?, ?, 'open')`,
@@ -299,7 +299,7 @@ export async function addMessage(
     return { success: false, error: 'Only team members can post messages' };
   }
 
-  const messageId = uuidv4();
+  const messageId = randomUUID();
   await query(
     `INSERT INTO review_messages (id, thread_id, author_user_id, content)
      VALUES (?, ?, ?, ?)`,
@@ -352,7 +352,7 @@ export async function uploadFile(
     return { success: false, error: 'Only the completing user can upload proof files' };
   }
 
-  const fileId = uuidv4();
+  const fileId = randomUUID();
   await query(
     `INSERT INTO review_files (id, thread_id, uploaded_by_user_id, file_path, file_size, file_name, mime_type)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -414,7 +414,7 @@ export async function submitVote(
     await connection.beginTransaction();
 
     // Insert or update vote
-    const voteId = uuidv4();
+    const voteId = randomUUID();
     await connection.execute(
       `INSERT INTO review_votes (id, thread_id, voter_user_id, vote)
        VALUES (?, ?, ?, ?)
@@ -423,26 +423,31 @@ export async function submitVote(
     );
 
     // Get the actual vote record (in case of update)
-    const [voteRows] = await connection.execute<VoteRow[]>(
+    const [voteRowsUnknown] = await connection.execute(
       `SELECT * FROM review_votes WHERE thread_id = ? AND voter_user_id = ?`,
       [threadId, voterUserId]
     );
 
+    const voteRows = voteRowsUnknown as VoteRow[];
     const savedVote = rowToVote(voteRows[0]);
 
     // Check if all eligible voters have voted
     // Get all team members except the completing user
-    const [teamMemberRows] = await connection.execute<{ user_id: string }[]>(
+    const [teamMemberRowsUnknown] = await connection.execute(
       `SELECT user_id FROM team_memberships WHERE team_id = ? AND user_id != ?`,
       [cellInfo.team_id, thread.completedByUserId]
     );
 
+    const teamMemberRows = teamMemberRowsUnknown as Array<{ user_id: string }>;
+
     const eligibleVoters = teamMemberRows.length;
 
-    const [allVoteRows] = await connection.execute<VoteRow[]>(
+    const [allVoteRowsUnknown] = await connection.execute(
       `SELECT * FROM review_votes WHERE thread_id = ?`,
       [threadId]
     );
+
+    const allVoteRows = allVoteRowsUnknown as VoteRow[];
 
     const totalVotes = allVoteRows.length;
 

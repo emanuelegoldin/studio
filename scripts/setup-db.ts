@@ -59,6 +59,19 @@ async function setupDatabase() {
   // Apply minimal, safe migrations for existing databases.
   // This is needed because CREATE TABLE IF NOT EXISTS will not update existing columns.
   const migrationStatements: string[] = [
+    // 0) Add missing tables for proof voting (older DBs created before votes existed).
+    `CREATE TABLE IF NOT EXISTS review_votes (
+      id VARCHAR(36) PRIMARY KEY,
+      thread_id VARCHAR(36) NOT NULL,
+      voter_user_id VARCHAR(36) NOT NULL,
+      vote ENUM('accept', 'deny') NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_vote (thread_id, voter_user_id),
+      FOREIGN KEY (thread_id) REFERENCES review_threads(id) ON DELETE CASCADE,
+      FOREIGN KEY (voter_user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_thread (thread_id)
+    )`,
     // 1) Expand legacy enum (to_complete/completed) to also include new states.
     `ALTER TABLE bingo_cells MODIFY COLUMN state ENUM('to_complete', 'completed', 'pending', 'pending_review', 'accomplished') DEFAULT 'pending'`,
     // 2) Map legacy value to the new default state.
