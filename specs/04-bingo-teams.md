@@ -10,6 +10,7 @@ Support team-based bingo gameplay with invitations, membership, and shared resol
 
 - Create a team and invite other users
 - Join a team when invited
+- Delete a team as leader
 - Define a team resolution
 - Create resolutions for other team members
 - Start bingo once setup is complete
@@ -19,6 +20,7 @@ Support team-based bingo gameplay with invitations, membership, and shared resol
 ## In Scope
 
 - Team creation
+- Team deletion
 - Invitations and joining
 - Team membership and roles
 - Team resolution definition
@@ -46,6 +48,19 @@ Unverified users:
 
 - A verified user can create a team.
 - The creator becomes the team leader.
+
+---
+
+### Team Deletion
+
+- A verified **team leader** can delete their team.
+- Only the team leader can delete a team.
+- Deletion is a **hard delete**.
+- Due to database `ON DELETE CASCADE` constraints, deleting a team also deletes associated data, including:
+  - Team memberships
+  - Team invitations
+  - Team-provided resolutions
+  - Bingo cards and all dependent gameplay/proof/review records
 
 ---
 
@@ -88,6 +103,7 @@ Unverified users:
   - Invite users
   - Define team resolution
   - Start the bingo game
+  - Delete the team
 - Team members can:
   - Provide resolutions for other members
 
@@ -100,6 +116,8 @@ Unverified users:
 - Unverified users are blocked from all team actions.
 - Team leader can define team resolution.
 - Bingo cannot start until all required resolutions exist.
+- Team leader can delete their team.
+- Non-leaders cannot delete teams.
 
 ---
 

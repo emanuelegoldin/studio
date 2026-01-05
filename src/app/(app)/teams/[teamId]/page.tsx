@@ -15,8 +15,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Crown, Send, Settings, Swords, Copy, UserPlus, Loader2, Check } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Crown, Send, Settings, Swords, Copy, UserPlus, Loader2, Check, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 interface TeamMember {
@@ -80,12 +92,17 @@ interface TeamProvidedResolution {
 
 export default function TeamDetailPage({ params }: { params: Promise<{ teamId: string }> }) {
   const { toast } = useToast();
+  const router = useRouter();
   const [teamId, setTeamId] = useState<string>('');
   const [team, setTeam] = useState<Team | null>(null);
   const [cards, setCards] = useState<BingoCardData[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+
+  // Delete team dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Team resolution dialog
   const [resolutionDialogOpen, setResolutionDialogOpen] = useState(false);
@@ -321,6 +338,48 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
     }
   };
 
+  const handleDeleteTeam = async () => {
+    if (!teamId) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/teams/${teamId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const data = await response
+        .json()
+        .catch(() => ({} as { error?: string }));
+
+      if (response.ok) {
+        setDeleteDialogOpen(false);
+        toast({
+          title: 'Team deleted',
+          description: 'The team and its related data were removed.',
+        });
+        router.push('/teams');
+        router.refresh();
+        return;
+      }
+
+      toast({
+        title: 'Error',
+        description: data?.error || 'Failed to delete team',
+        variant: 'destructive',
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'An error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleCellUpdate = async (cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response = await fetch(`/api/cells/${cellId}`, {
@@ -471,6 +530,43 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                   <Swords className="h-4 w-4 mr-2" /> Start Bingo
                 </Button>
               </>
+            )}
+
+            {isLeader && (
+              <AlertDialog
+                open={deleteDialogOpen}
+                onOpenChange={(open: boolean) => {
+                  if (!isDeleting) setDeleteDialogOpen(open);
+                }}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Team
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this team?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the team, its memberships, invitations, team-provided resolutions,
+                      bingo cards, and related gameplay data. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel asChild>
+                      <Button variant="outline" disabled={isDeleting}>
+                        Cancel
+                      </Button>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button variant="destructive" onClick={handleDeleteTeam} disabled={isDeleting}>
+                        {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Delete
+                      </Button>
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
             {team.status === 'forming' && (
               <Dialog open={memberResolutionsOpen} onOpenChange={setMemberResolutionsOpen}>
