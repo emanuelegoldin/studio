@@ -1,51 +1,109 @@
-# 04 — Bingo Teams
+# 04 — Bingo Teams (Updated)
 
 ## Purpose
-Support team-based play: teams, invitations, membership, and a team-wide resolution.
+
+Support team-based bingo gameplay with invitations, membership, and shared resolutions, **restricted to verified users only**.
+
+---
 
 ## User Stories Covered
+
 - Create a team and invite other users
-- Define a team resolution that is the same for the whole team
-- Invited user can join a team and publish their bingo card
-- Teammember can create a resolution for every other teammember
-- Teamleader can start bingo once all members created resolutions for all others
+- Join a team when invited
+- Define a team resolution
+- Create resolutions for other team members
+- Start bingo once setup is complete
+
+---
 
 ## In Scope
+
 - Team creation
-- Team invitations and joining
-- Team membership
-- Team leader role
+- Invitations and joining
+- Team membership and roles
 - Team resolution definition
-- Member-to-member resolution submissions (inputs for card generation)
+- Member-provided resolutions
+- Bingo start conditions
+- Verification-based access restrictions
+
+---
 
 ## Functional Requirements
+
+### Verification Requirement
+
+All team-related actions require the user to be **verified**.
+
+Unverified users:
+- Cannot create teams
+- Cannot join teams
+- Cannot accept invitations
+- Cannot start bingo games
+
+---
+
 ### Team Creation
-- A user can create a team and becomes team leader.
+
+- A verified user can create a team.
+- The creator becomes the team leader.
+
+---
 
 ### Invitations / Joining
-- Team leader can invite users.
-- Invited users can accept/join the team.
-- The invitation mechanism (email link, invite code, in-app) is not specified; implementation may pick one.
 
-### Team Resolution
-- Team leader sets one team resolution text.
-- This resolution is used as the center "joker" cell.
+- Team leader can invite users.
+- Only verified users can accept invitations and join teams.
+- Invitation mechanism is implementation-defined.
+
+---
+
+### Team Resolution (Joker Cell)
+
+- Team leader defines one team-wide resolution.
+- This resolution appears as the center joker cell on all team bingo cards.
+- Joker cell is informational and not checkable.
+
+---
 
 ### Member-Provided Resolutions
-- For a given team, each member can create a resolution for each other member.
-- A member cannot create a "for myself" entry in this category (unless explicitly desired; not specified).
+
+- For each team:
+  - Each member must create a resolution for every **other** member.
+- Members cannot create a resolution for themselves unless explicitly allowed by future specs.
+
+---
 
 ### Start Conditions
-- Team leader can start the bingo only when:
-  - all current team members have provided a resolution for every other member.
+
+- Team leader may start bingo only when:
+  - All team members have provided resolutions for every other member
+  - All participating members are verified
+
+---
 
 ## Permissions
-- Only team leader: invite users, set team resolution, start game.
-- Team members: join team (if invited), create resolutions for other members.
+
+- Only verified users can participate in teams.
+- Only team leader can:
+  - Invite users
+  - Define team resolution
+  - Start the bingo game
+- Team members can:
+  - Provide resolutions for other members
+
+---
 
 ## Acceptance Criteria
-- Team leader can create a team and invite users.
-- Invited users can join.
-- Team leader can define the team resolution.
-- Members can provide resolutions for each other.
-- Leader cannot start until all required member-provided resolutions exist.
+
+- Verified user can create a team.
+- Verified invited users can join.
+- Unverified users are blocked from all team actions.
+- Team leader can define team resolution.
+- Bingo cannot start until all required resolutions exist.
+
+---
+
+## Notes
+
+- Verification checks must be enforced server-side.
+- UI may hide or disable team actions for unverified users, but backend validation is mandatory.
