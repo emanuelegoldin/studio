@@ -20,6 +20,7 @@ import {
 import { Badge } from "./ui/badge";
 import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { findUserById } from "@/lib/db";
 
 interface BingoCell {
   id: string;
@@ -356,7 +357,7 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
         )}
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'member_provided' && (
           <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
-            From Team
+            {cell.sourceUserId ? findUserById(cell.sourceUserId).then(u => u?.username) : "Team member"}
           </Badge>
         )}
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'personal' && (
@@ -482,7 +483,7 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
                       <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border p-2">
                         {thread.messages.map((m: any) => (
                           <div key={m.id} className="text-sm">
-                            <p className="text-xs text-muted-foreground">{m.authorUserId}</p>
+                            <p className="text-xs text-muted-foreground">{findUserById(m.id).then(u => u?.username)}</p>
                             <p>{m.content}</p>
                           </div>
                         ))}
