@@ -64,14 +64,15 @@ export default function Home() {
                 <p className="max-w-[700px] text-foreground/80 md:text-xl">
                   Resolution Bingo transforms your personal goals into a fun, competitive, and collaborative team experience.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4">
+                {/* TODO: Implement functionality or remove buttons
+                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button size="lg" asChild>
                     <Link href="/register">Create Your Team</Link>
                   </Button>
                    <Button size="lg" variant="secondary" asChild>
                     <Link href="/login">Join a Game</Link>
                   </Button>
-                </div>
+                </div> */}
               </div>
                {heroImage && (
                 <div className="hidden md:flex justify-center">
@@ -117,14 +118,15 @@ export default function Home() {
         </section>
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-foreground/60">&copy; 2024 Resolution Bingo. All rights reserved.</p>
+        <p className="text-xs text-foreground/60">&copy; 2026 Resolution Bingo.</p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>
+          {/* TODO: Add links when pages are available
+           <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>
             Terms of Service
           </Link>
           <Link href="#" className="text-xs hover:underline underline-offset-4" prefetch={false}>
             Privacy
-          </Link>
+          </Link> */}
         </nav>
       </footer>
     </div>
