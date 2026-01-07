@@ -63,7 +63,7 @@ export default function JoinTeamPage({ params }: { params: Promise<{ inviteCode:
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
       <div className="mb-8 flex items-center gap-2">
-        <AppLogo className="h-8 w-8 text-primary" />
+        <AppLogo />
         <span className="text-2xl font-semibold font-headline">Resolution Bingo</span>
       </div>
 

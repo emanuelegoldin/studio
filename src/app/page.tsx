@@ -31,7 +31,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen">
       <header className="px-4 lg:px-6 h-16 flex items-center shadow-sm bg-card">
         <Link href="/" className="flex items-center justify-center gap-2">
-          <AppLogo className="h-6 w-6 text-primary" />
+          <AppLogo />
           <span className="font-semibold font-headline">Resolution Bingo</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">

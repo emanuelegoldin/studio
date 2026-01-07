@@ -11,7 +11,7 @@ export default function AuthLayout({
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
             <Link href="/" className="flex items-center justify-center gap-2">
-                <AppLogo className="h-8 w-8 text-primary" />
+                <AppLogo />
                 <span className="text-2xl font-semibold font-headline">Resolution Bingo</span>
             </Link>
         </div>

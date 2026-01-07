@@ -43,7 +43,7 @@ export function AppSidebar() {
     <>
       <SidebarHeader>
         <Link href="/dashboard" className="flex items-center gap-2">
-          <AppLogo className="h-6 w-6 text-primary" />
+          <AppLogo />
           <span className="text-lg font-semibold font-headline">Resolution Bingo</span>
         </Link>
       </SidebarHeader>
