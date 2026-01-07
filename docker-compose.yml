@@ -7,11 +7,11 @@ services:
     container_name: studio-mariadb
     environment:
       MARIADB_DATABASE: resolution_bingo
-      MARIADB_USER: studio
-      MARIADB_PASSWORD: studio
-      MARIADB_ROOT_PASSWORD: root
+      MARIADB_USER: studio # move to .env
+      MARIADB_PASSWORD: studio # move to .env
+      MARIADB_ROOT_PASSWORD: root # move to .env
     ports:
-      - "3306:3306"
+      - "3306:3306" # move to .env
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
@@ -19,6 +19,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  nginx:
+    # TODO: define nginx entrypoint on localhost 80, 443
+  nextjs:
+    # TODO: run the app on port 3000
+  phpmyadmin:
+    # TODO: define helper service (db inspection)
 
 volumes:
   mariadb_data:
