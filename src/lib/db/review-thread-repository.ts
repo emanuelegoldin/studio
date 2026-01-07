@@ -17,6 +17,7 @@ import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
+import { PoolConnection } from 'mysql2/promise';
 
 // Row types from database
 interface ThreadRow {
@@ -457,7 +458,7 @@ export async function submitVote(
 
     // If all eligible voters have voted, close the thread
     // Note: Handle edge case where there are no eligible voters (single-member team)
-    var fileRows: {file_path: string}[] = []
+    let fileRows: {file_path: string}[] = []
     if (eligibleVoters > 0 && totalVotes >= eligibleVoters) {
       // Count accept votes
       const acceptVotes = allVoteRows.filter((v: VoteRow) => v.vote === 'accept').length;
@@ -482,24 +483,17 @@ export async function submitVote(
       threadClosed = true;
 
       // Delete messages
-      await cleanUpThreadMessages(threadId);
-
-      // Get filepaths
-      fileRows = await query<{ file_path: string }[]>(
+      await cleanUpThreadMessages(threadId, connection);
+      // Get filepaths (use the same connection/transaction and destructure the row result)
+      const [fileRowsResult] = await connection.execute(
         `SELECT file_path FROM review_files WHERE thread_id = ?`,
         [threadId]
       );
+      fileRows = fileRowsResult as { file_path: string }[];
 
       // Delete file records from database
-      await query(
-        `DELETE FROM review_files WHERE thread_id = ?`,
-        [threadId]
-      );
-
-    
-      // Close thread
       await connection.execute(
-        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
+        `DELETE FROM review_files WHERE thread_id = ?`,
         [threadId]
       );
     }
@@ -552,16 +546,17 @@ export async function closeThread(
     await connection.beginTransaction();
 
     // Delete messages
-    await cleanUpThreadMessages(threadId);
+    await cleanUpThreadMessages(threadId, connection);
 
     // Get filepaths
-    const fileRows = await query<{ file_path: string }[]>(
-      `SELECT file_path FROM review_files WHERE thread_id = ?`,
-      [threadId]
-    );
+    const [fileRowsResult] = await connection.execute(
+        `SELECT file_path FROM review_files WHERE thread_id = ?`,
+        [threadId]
+      );
+    const fileRows = fileRowsResult as { file_path: string }[];
 
      // Delete file records from database
-    await query(
+    await connection.execute(
       `DELETE FROM review_files WHERE thread_id = ?`,
       [threadId]
     );
@@ -597,8 +592,8 @@ export async function getOpenThreadForCell(cellId: string): Promise<ReviewThread
   return rows.length > 0 ? rowToThread(rows[0]) : null;
 }
 
-async function cleanUpThreadMessages(threadId: string): Promise<void> {
-  await query(
+async function cleanUpThreadMessages(threadId: string, connection: PoolConnection): Promise<void> {
+  connection.execute(
     `DELETE FROM review_messages WHERE thread_id = ?`,
     [threadId]
   );
