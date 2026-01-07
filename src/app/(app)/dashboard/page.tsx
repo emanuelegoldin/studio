@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Users, Plus } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
 interface BingoCell {
   id: string;
@@ -61,6 +62,8 @@ interface Team {
 }
 
 export default function DashboardPage() {
+  useSetAppHeaderTitle("Dashboard");
+
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [teams, setTeams] = useState<Team[]>([]);

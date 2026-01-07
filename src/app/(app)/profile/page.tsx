@@ -17,20 +17,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
+import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
 interface User {
   id: string;
   username: string;
   email: string;
   emailVerified: boolean;
-}
-
-interface Resolution {
-  id: string;
-  ownerUserId: string;
-  text: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 function ProfileForm() {
@@ -244,12 +237,10 @@ function ProfileForm() {
 }
 
 export default function ProfilePage() {
+  useSetAppHeaderTitle("Settings");
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight font-headline">
-        Settings
-      </h1>
-
       <Tabs defaultValue="profile">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>

@@ -30,6 +30,7 @@ import { Crown, Send, Settings, Swords, Copy, UserPlus, Loader2, Check, Trash2 }
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
 interface TeamMember {
   membership: {
@@ -92,6 +93,8 @@ interface TeamProvidedResolution {
 }
 
 export default function TeamDetailPage({ params }: { params: Promise<{ teamId: string }> }) {
+  useSetAppHeaderTitle("Team");
+
   const { toast } = useToast();
   const router = useRouter();
   const [teamId, setTeamId] = useState<string>('');

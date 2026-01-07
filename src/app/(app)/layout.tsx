@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
+import { AppHeaderTitleProvider } from "@/components/app-header-title";
 
 export default function AppLayout({
   children,
@@ -9,15 +10,15 @@ export default function AppLayout({
 }>) {
   return (
     <SidebarProvider>
+      <AppHeaderTitleProvider defaultTitle="Dashboard">
         <Sidebar>
-            <AppSidebar />
+          <AppSidebar />
         </Sidebar>
         <SidebarInset>
-            <AppHeader />
-            <main className="flex-1 p-4 md:p-6 lg:p-8">
-                {children}
-            </main>
+          <AppHeader />
+          <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
         </SidebarInset>
+      </AppHeaderTitleProvider>
     </SidebarProvider>
   );
 }

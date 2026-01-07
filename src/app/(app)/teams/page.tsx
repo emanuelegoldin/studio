@@ -15,6 +15,7 @@ import { Plus, Users, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
 interface TeamMember {
   membership: {
@@ -44,6 +45,8 @@ interface Team {
 }
 
 export default function TeamsPage() {
+  useSetAppHeaderTitle("Teams");
+
   const { toast } = useToast();
   const [teams, setTeams] = useState<Team[]>([]);
   const [isLoading, setIsLoading] = useState(true);
