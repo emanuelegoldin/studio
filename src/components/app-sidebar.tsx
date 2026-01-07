@@ -35,7 +35,7 @@ const menuItems = [
     icon: User,
   },
   {
-    href: "/profile/resolutions",
+    href: "/resolutions",
     label: "Resolutions",
     icon: ListCheck
   }

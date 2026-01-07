@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
 interface Resolution {
   id: string;
@@ -185,11 +186,10 @@ function ResolutionsManager() {
 }
 
 export default function ResolutionsPage() {
+  useSetAppHeaderTitle("Resolutions");
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight font-headline">
-        Resolutions
-      </h1>
       <ResolutionsManager />
     </div>
   );
