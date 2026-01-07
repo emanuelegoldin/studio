@@ -586,8 +586,8 @@ async function deleteThreadFiles(threadId: string): Promise<void> {
   for (const file of fileRows) {
     try {
       // Stored as a public URL like "/uploads/review-files/<name>".
-      const publicRelativePath = (file.file_path || '').replace(/^\/+/, '');
-
+      const publicRelativePath = path.normalize((file.file_path || '').replace(/^\/+/, ''));
+      
       // Safety: only allow deleting from uploads/review-files.
       if (!publicRelativePath.startsWith('uploads/review-files/')) {
         console.error(
