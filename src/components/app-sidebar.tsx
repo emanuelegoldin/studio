@@ -65,17 +65,7 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter>
-        <div className="hidden flex-col gap-2 rounded-lg border bg-card p-4 text-center group-data-[collapsible=icon]:flex">
-            <h3 className="font-headline font-semibold">New Team?</h3>
-            <Button size="sm">Create</Button>
-        </div>
-        <div className="flex flex-col gap-2 rounded-lg border bg-card p-4 text-center group-data-[collapsible=icon]:hidden">
-            <h3 className="font-headline font-semibold">Ready for a new challenge?</h3>
-            <p className="text-sm text-muted-foreground">Create a new team and invite your friends to join.</p>
-            <Button size="sm">Create New Team</Button>
-        </div>
-      </SidebarFooter>
+      <SidebarFooter/>
     </>
   );
 }
