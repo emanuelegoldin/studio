@@ -15,6 +15,8 @@ import type {
 } from './types';
 import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 
 // Row types from database
 interface ThreadRow {
@@ -464,29 +466,25 @@ export async function submitVote(
       // Spec: ≥50% accept → accomplished, <50% → pending
       const newState = acceptPercentage >= 0.5 ? 'accomplished' : 'pending';
 
-      // Close thread and update cell state
-      await connection.execute(
-        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
-        [threadId]
-      );
-
+      
+      // Update cell state
       await connection.execute(
         `UPDATE bingo_cells SET state = ? WHERE id = ?`,
         [newState, thread.cellId]
       );
 
+      // Close thread
+      await connection.execute(
+        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
+        [threadId]
+      );
       threadClosed = true;
 
-      // Clean up thread data (messages and files)
-      await connection.execute(
-        `DELETE FROM review_messages WHERE thread_id = ?`,
-        [threadId]
-      );
+      // Delete messages
+      await cleanUpThreadMessages(threadId);
 
-      await connection.execute(
-        `DELETE FROM review_files WHERE thread_id = ?`,
-        [threadId]
-      );
+      // Delete files
+      await deleteThreadFiles(threadId);
     }
 
     await connection.commit();
@@ -535,16 +533,11 @@ export async function closeThread(
   try {
     await connection.beginTransaction();
 
-    // Delete messages and files
-    await connection.execute(
-      `DELETE FROM review_messages WHERE thread_id = ?`,
-      [threadId]
-    );
+    // Delete messages
+    await cleanUpThreadMessages(threadId);
 
-    await connection.execute(
-      `DELETE FROM review_files WHERE thread_id = ?`,
-      [threadId]
-    );
+    // Delete files
+    await deleteThreadFiles(threadId);
 
     // Close thread
     await connection.execute(
@@ -573,4 +566,47 @@ export async function getOpenThreadForCell(cellId: string): Promise<ReviewThread
   );
 
   return rows.length > 0 ? rowToThread(rows[0]) : null;
+}
+
+async function cleanUpThreadMessages(threadId: string): Promise<void> {
+  await query(
+    `DELETE FROM review_messages WHERE thread_id = ?`,
+    [threadId]
+  );
+}
+
+async function deleteThreadFiles(threadId: string): Promise<void> {
+  // 1. Get file paths for deletion from storage
+  const fileRows = await query<{ file_path: string }[]>(
+    `SELECT file_path FROM review_files WHERE thread_id = ?`,
+    [threadId]
+  );
+
+  // 2. Delete files from storage
+  for (const file of fileRows) {
+    try {
+      // Stored as a public URL like "/uploads/review-files/<name>".
+      const publicRelativePath = (file.file_path || '').replace(/^\/+/, '');
+
+      // Safety: only allow deleting from uploads/review-files.
+      if (!publicRelativePath.startsWith('uploads/review-files/')) {
+        console.error(
+          'Refusing to delete unexpected file path:',
+          file.file_path
+        );
+        continue;
+      }
+
+      const fileLocation = path.join(process.cwd(), 'public', publicRelativePath);
+      await rm(fileLocation, { force: true });
+    } catch (error) {
+      console.error('Error deleting file from storage:', error);
+    }
+  }
+
+  // 3. Delete file records from database
+  await query(
+    `DELETE FROM review_files WHERE thread_id = ?`,
+    [threadId]
+  );
 }
