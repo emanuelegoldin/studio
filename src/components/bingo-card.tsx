@@ -20,7 +20,7 @@ import {
 import { Badge } from "./ui/badge";
 import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { findUserById } from "@/lib/db";
+import { ReviewFile, ReviewMessage, ReviewThreadWithDetails } from "@/lib/db";
 
 interface BingoCell {
   id: string;
@@ -58,10 +58,11 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | null>(null);
   const { toast } = useToast();
+  const [usernames, setUsernames] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [messageDraft, setMessageDraft] = useState('');
-  const [thread, setThread] = useState<any | null>(null);
+  const [thread, setThread] = useState<ReviewThreadWithDetails | null>(null);
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -117,6 +118,23 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
   };
 
   useEffect(() => {
+    // Fetch username for the cell's source user (client-safe via API)
+    const fetchCellUser = async () => {
+      const id = cell.sourceUserId;
+      if (!id) return;
+      if (usernames[id]) return;
+      try {
+        const res = await fetch(`/api/users/${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.username) setUsernames(prev => ({ ...prev, [id]: data.username }));
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchCellUser();
+
     if (!isModalOpen) {
       setSelectedFile(null);
       setMessageDraft('');
@@ -126,6 +144,33 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
       setIsSubmitting(false);
     }
   }, [isModalOpen]);
+
+  useEffect(() => {
+    // When a thread is loaded, fetch author usernames for its messages
+    const fetchThreadAuthors = async () => {
+      const msgs: Array<ReviewMessage> = thread?.messages || [];
+      const ids: string[] = Array.from(new Set<string>(
+        msgs
+          .map((m: ReviewMessage) => (m.authorUserId))
+          .filter((v: any): v is string => typeof v === 'string')
+      ));
+      const missing = ids.filter((id) => !usernames[id]);
+      if (missing.length === 0) return;
+
+      await Promise.all(missing.map(async (id: string) => {
+        try {
+          const res = await fetch(`/api/users/${id}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data?.username) setUsernames(prev => ({ ...prev, [id]: data.username }));
+        } catch {
+          // ignore
+        }
+      }));
+    };
+
+    fetchThreadAuthors();
+  }, [thread?.messages]);
 
   useEffect(() => {
     const loadThread = async () => {
@@ -357,7 +402,7 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
         )}
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'member_provided' && (
           <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
-            {cell.sourceUserId ? findUserById(cell.sourceUserId).then(u => u?.username) : "Team member"}
+            {cell.sourceUserId ? (usernames[cell.sourceUserId] ?? "Team member") : "Team member"}
           </Badge>
         )}
         {!cell.isJoker && !cell.isEmpty && cell.sourceType === 'personal' && (
@@ -414,7 +459,7 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
                     <p className="text-sm font-medium">Files</p>
                     {thread.files?.length ? (
                       <div className="space-y-1">
-                        {thread.files.map((f: any) => (
+                        {thread.files.map((f: ReviewFile) => (
                           <a
                             key={f.id}
                             href={f.filePath}
@@ -481,12 +526,15 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
                     <p className="text-sm font-medium">Messages</p>
                     {thread.messages?.length ? (
                       <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border p-2">
-                        {thread.messages.map((m: any) => (
-                          <div key={m.id} className="text-sm">
-                            <p className="text-xs text-muted-foreground">{findUserById(m.id).then(u => u?.username)}</p>
-                            <p>{m.content}</p>
-                          </div>
-                        ))}
+                        {thread.messages.map((m: ReviewMessage) => {
+                          const authorId = m.authorUserId;
+                          return (
+                            <div key={m.id} className="text-sm">
+                              <p className="text-xs text-muted-foreground">{usernames[authorId] ?? 'User'}</p>
+                              <p>{m.content}</p>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-xs text-muted-foreground">No messages yet</p>
