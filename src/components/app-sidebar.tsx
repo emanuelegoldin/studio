@@ -37,7 +37,7 @@ const menuItems = [
   {
     href: "/resolutions",
     label: "Resolutions",
-    icon: ListCheck
+    icon: ListCheck,
   }
 ];
 
@@ -70,7 +70,7 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter/>
+      <SidebarFooter />
     </>
   );
 }
