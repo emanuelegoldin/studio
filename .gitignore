@@ -51,4 +51,5 @@ firebase-debug.log
 firestore-debug.log
 
 # uploads
-/public/uploads
+/public/uploads/review-files/*
+!/public/uploads/review-files/.gitkeep
