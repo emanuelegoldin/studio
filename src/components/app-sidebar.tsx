@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutGrid,
+  ListCheck,
   User,
   Users,
 } from "lucide-react";
@@ -34,6 +35,11 @@ const menuItems = [
     label: "Profile",
     icon: User,
   },
+  {
+    href: "/profile/resolutions",
+    label: "Resolutions",
+    icon: ListCheck
+  }
 ];
 
 export function AppSidebar() {
