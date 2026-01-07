@@ -457,6 +457,7 @@ export async function submitVote(
 
     // If all eligible voters have voted, close the thread
     // Note: Handle edge case where there are no eligible voters (single-member team)
+    var fileRows: {file_path: string}[] = []
     if (eligibleVoters > 0 && totalVotes >= eligibleVoters) {
       // Count accept votes
       const acceptVotes = allVoteRows.filter((v: VoteRow) => v.vote === 'accept').length;
@@ -483,11 +484,28 @@ export async function submitVote(
       // Delete messages
       await cleanUpThreadMessages(threadId);
 
-      // Delete files
-      await deleteThreadFiles(threadId);
+      // Get filepaths
+      fileRows = await query<{ file_path: string }[]>(
+        `SELECT file_path FROM review_files WHERE thread_id = ?`,
+        [threadId]
+      );
+
+      // Delete file records from database
+      await query(
+        `DELETE FROM review_files WHERE thread_id = ?`,
+        [threadId]
+      );
+
+    
+      // Close thread
+      await connection.execute(
+        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
+        [threadId]
+      );
     }
 
     await connection.commit();
+    deleteThreadFiles(fileRows)
 
     return { success: true, vote: savedVote, threadClosed };
   } catch (error) {
@@ -536,16 +554,27 @@ export async function closeThread(
     // Delete messages
     await cleanUpThreadMessages(threadId);
 
-    // Delete files
-    await deleteThreadFiles(threadId);
+    // Get filepaths
+    const fileRows = await query<{ file_path: string }[]>(
+      `SELECT file_path FROM review_files WHERE thread_id = ?`,
+      [threadId]
+    );
 
+     // Delete file records from database
+    await query(
+      `DELETE FROM review_files WHERE thread_id = ?`,
+      [threadId]
+    );
+
+  
     // Close thread
     await connection.execute(
       `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
       [threadId]
     );
-
+  
     await connection.commit();
+    await deleteThreadFiles(fileRows);
 
     return { success: true };
   } catch (error) {
@@ -575,14 +604,7 @@ async function cleanUpThreadMessages(threadId: string): Promise<void> {
   );
 }
 
-async function deleteThreadFiles(threadId: string): Promise<void> {
-  // 1. Get file paths for deletion from storage
-  const fileRows = await query<{ file_path: string }[]>(
-    `SELECT file_path FROM review_files WHERE thread_id = ?`,
-    [threadId]
-  );
-
-  // 2. Delete files from storage
+async function deleteThreadFiles(fileRows: {file_path: string}[]): Promise<void> {
   for (const file of fileRows) {
     try {
       // Stored as a public URL like "/uploads/review-files/<name>".
@@ -603,10 +625,4 @@ async function deleteThreadFiles(threadId: string): Promise<void> {
       console.error('Error deleting file from storage:', error);
     }
   }
-
-  // 3. Delete file records from database
-  await query(
-    `DELETE FROM review_files WHERE thread_id = ?`,
-    [threadId]
-  );
 }
