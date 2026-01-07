@@ -10,7 +10,10 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "db:setup": "tsx scripts/setup-db.ts"
+    "db:setup": "tsx scripts/setup-db.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts migrate",
+    "db:baseline": "tsx scripts/db-migrate.ts baseline",
+    "db:status": "tsx scripts/db-migrate.ts status"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",

@@ -1,0 +1,17 @@
+[Unit]
+Description=Run Resolution Bingo DB backups periodically
+
+[Timer]
+# Daily at 03:15 (server local time)
+OnCalendar=*-*-* 03:15:00
+
+# If the laptop was powered off at the scheduled time, run the job on next boot.
+Persistent=true
+
+# Add jitter to avoid running at a predictable time.
+RandomizedDelaySec=15m
+
+Unit=resolution-bingo-db-backup.service
+
+[Install]
+WantedBy=timers.target

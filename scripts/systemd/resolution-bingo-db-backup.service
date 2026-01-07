@@ -1,0 +1,14 @@
+[Unit]
+Description=Resolution Bingo MariaDB backup
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Set this to where your repo lives on the Ubuntu Server machine.
+WorkingDirectory=/opt/resolution-bingo
+
+# Copy scripts/backup.env.example to /opt/resolution-bingo/backup.env and edit it.
+EnvironmentFile=/opt/resolution-bingo/backup.env
+
+ExecStart=/bin/bash /opt/resolution-bingo/scripts/db-backup.sh
