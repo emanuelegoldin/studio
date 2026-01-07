@@ -1,6 +1,6 @@
 services:
   mariadb:
-    build:
+    build: # TODO remove build; pull images from registry
       context: .
       dockerfile: Dockerfile.mariadb
     image: studio-mariadb:local
