@@ -617,7 +617,11 @@ async function deleteThreadFiles(fileRows: {file_path: string}[]): Promise<void>
       const fileLocation = path.join(process.cwd(), 'public', publicRelativePath);
       await rm(fileLocation, { force: true });
     } catch (error) {
-      console.error('Error deleting file from storage:', error);
+      if (error && typeof error === 'object' && 'code' in error) {
+        console.error('Error deleting file from storage:', error);
+        continue;
+      }
+      throw error;
     }
   }
 }
