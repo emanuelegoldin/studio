@@ -3,7 +3,17 @@ name: ci
 on:
   push:
     branches: [ main ]
-
+    paths-ignore:
+      - docs/**
+      - specs/**
+      - *.example
+      - *.md
+      - .dockerignore
+      - .gitignore
+      - .modified
+      - .devcontainer/**
+      - .github/**
+      
 permissions:
   contents: read
   packages: write
