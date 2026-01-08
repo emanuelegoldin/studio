@@ -34,6 +34,11 @@ services:
       DB_HOST: mariadb
       APP_BASE_URL: http://localhost # nginx listens on localhost:80
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"] 
+      interval: 10s
+      timeout: 5s
+      retries: 20
     depends_on:
       mariadb:
         condition: service_healthy
