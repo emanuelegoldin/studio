@@ -154,7 +154,7 @@ function ProfileForm() {
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20">
-            <AvatarFallback className="text-2xl">{user?.username?.charAt(0) || '?'}</AvatarFallback>
+            <AvatarFallback className="text-2xl">{String.fromCodePoint(user?.username?.codePointAt(0) || 63)}</AvatarFallback>
           </Avatar>
           <div>
             <p className="font-medium">{user?.username}</p>
