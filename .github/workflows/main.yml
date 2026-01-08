@@ -4,15 +4,15 @@ on:
   push:
     branches: [ main ]
     paths-ignore:
-      - docs/**
-      - specs/**
-      - *.example
-      - *.md
-      - .dockerignore
-      - .gitignore
-      - .modified
-      - .devcontainer/**
-      - .github/**
+      - 'docs/**'
+      - 'specs/**'
+      - '*.example'
+      - '*.md'
+      - '.dockerignore'
+      - '.gitignore'
+      - '.modified'
+      - '.devcontainer/**'
+      - '.github/**'
       
 permissions:
   contents: read
