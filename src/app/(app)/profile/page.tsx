@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
+import { UserProfile } from '@/lib/db';
 
 interface User {
   id: string;
@@ -40,7 +41,17 @@ function ProfileForm() {
   const loadProfile = useCallback(async () => {
     try {
       const response = await fetch('/api/profile');
-      const data = await response.json();
+      // From api/profile/page.tsx lines 47-56
+      const data: {
+      profile: UserProfile,
+      user: {
+        id: string,
+        username: string,
+        email: string,
+        emailVerified: boolean,
+      },
+      isOwner: boolean,
+    } = await response.json();
       
       if (response.ok) {
         setUser(data.user);
