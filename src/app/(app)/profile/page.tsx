@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
+import { UserProfile } from '@/lib/db';
 
 interface User {
   id: string;
@@ -40,7 +41,17 @@ function ProfileForm() {
   const loadProfile = useCallback(async () => {
     try {
       const response = await fetch('/api/profile');
-      const data = await response.json();
+      // From api/profile/page.tsx lines 47-56
+      const data: {
+      profile: UserProfile,
+      user: {
+        id: string,
+        username: string,
+        email: string,
+        emailVerified: boolean,
+      },
+      isOwner: boolean,
+    } = await response.json();
       
       if (response.ok) {
         setUser(data.user);
@@ -154,7 +165,7 @@ function ProfileForm() {
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20">
-            <AvatarFallback className="text-2xl">{user?.username?.charAt(0) || '?'}</AvatarFallback>
+            <AvatarFallback className="text-2xl">{String.fromCodePoint(user?.username?.codePointAt(0) || 63)}</AvatarFallback>
           </Avatar>
           <div>
             <p className="font-medium">{user?.username}</p>
