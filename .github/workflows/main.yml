@@ -23,4 +23,4 @@ jobs:
       - name: Create MariaDB image
         run: docker build -t ghcr.io/${{ github.actor }}/mariadb -f docker/Dockerfile.mariadb .
       - name: Push MariaDB image
-        run: docker push ghcr.io/${{ github.actor }}/mariadb:${{ github.sha }}
+        run: docker push ghcr.io/${{ github.actor }}/mariadb:latest
