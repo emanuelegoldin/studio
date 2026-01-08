@@ -4,8 +4,9 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.mariadb
-      args:
-        MARIADB_PORT: ${DB_PORT:-3306}
+# Uncomment the following lines to set a custom port via build argument
+      # args:
+      #   MARIADB_PORT: ${DB_PORT:-3306}
     image: nyr-bingo-mariadb:local
     container_name: nyr-bingo-mariadb
     env_file:
@@ -32,7 +33,8 @@ services:
       - .env
     environment:
       DB_HOST: mariadb
-      APP_BASE_URL: http://localhost # nginx listens on localhost:80
+      DB_PORT: 3306                   # Do not override DB_PORT if custom port is used - read from .env file
+      APP_BASE_URL: http://localhost  # nginx listens on localhost:80
     restart: always
     healthcheck:
       # node:lts-slim doesn't include curl; use Node's built-in fetch.
@@ -67,15 +69,13 @@ services:
         condition: service_healthy
   phpmyadmin:
     image: phpmyadmin:5.2.3
-    env_file:
-      - .env
     container_name: nyr-bingo-phpmyadmin
     restart: always
     ports:
       - "8080:80"
     environment:
       PMA_HOST: mariadb
-      PMA_PORT: ${DB_PORT}
+      PMA_PORT: 3306    # Use DB_PORT to match mariadb service port if changed - add .env file to service
     depends_on:
       mariadb:
         condition: service_healthy
