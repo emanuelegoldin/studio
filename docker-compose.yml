@@ -4,14 +4,16 @@ services:
       context: .
       dockerfile: docker/Dockerfile.mariadb
     image: studio-mariadb:local
-    container_name: studio-mariadb
+    container_name: nyr-bingo-mariadb
+    env_file:
+      - .env
     environment:
       MARIADB_DATABASE: resolution_bingo
-      MARIADB_USER: studio # move to .env
-      MARIADB_PASSWORD: studio # move to .env
-      MARIADB_ROOT_PASSWORD: root # move to .env
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
-      - "3306:3306" # move to .env
+      - "${DB_PORT}:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
@@ -25,14 +27,17 @@ services:
   #   # TODO: run the app on port 3000
   phpmyadmin:
     image: phpmyadmin:5.2.3
+    env_file:
+      - .env
+    container_name: nyr-bingo-phpmyadmin
     restart: always
     ports:
       - "8080:80"
     environment:
       PMA_HOST: mariadb
-      PMA_PORT: 3306
-      PMA_USER: studio # move to .env
-      PMA_PASSWORD: studio # move to .env
+      PMA_PORT: ${DB_PORT}
+      PMA_USER: ${DB_USER}
+      PMA_PASSWORD: ${DB_PASSWORD}
     depends_on:
       mariadb:
         condition: service_healthy
