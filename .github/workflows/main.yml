@@ -20,13 +20,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push mariadb
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.mariadb
-          push: true
-          tags: |
-            ghcr.io/my-org/studio-mariadb:prod
-            ghcr.io/my-org/studio-mariadb:${{ github.sha }}
+      - name: Create MariaDB image
+        run: docker build -t ghcr.io/${{ github.actor }}/mariadb -f docker/Dockerfile.mariadb .
+      - name: Push MariaDB image
+        run: docker push ghcr.io/${{ github.actor }}/mariadb:${{ github.sha }}
