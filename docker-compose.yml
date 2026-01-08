@@ -4,6 +4,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.mariadb
+      args:
+        MARIADB_PORT: ${DB_PORT:-3306}
     image: nyr-bingo-mariadb:local
     container_name: nyr-bingo-mariadb
     env_file:
@@ -20,7 +22,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    nextjs-app:
+  nextjs-app:
     build:
       context: .
       dockerfile: docker/Dockerfile.nextjs
