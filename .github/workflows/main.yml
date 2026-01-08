@@ -1,16 +1,16 @@
-name: Build and publish
+name: ci
 
 on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +21,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v5
+      - name: Build and push mariadb
+        uses: docker/build-push-action@v5
         with:
+          context: .
+          file: docker/Dockerfile.mariadb
           push: true
           tags: |
-            ghcr.io/my-org/my-app:prod
-            ghcr.io/my-org/my-app:${{ github.sha }}
+            ghcr.io/my-org/studio-mariadb:prod
+            ghcr.io/my-org/studio-mariadb:${{ github.sha }}
