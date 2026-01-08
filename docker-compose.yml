@@ -53,12 +53,12 @@ services:
         condition: service_healthy
   nginx:
     build:
-      context: ./docker/nginx
+      context: ./docker
       dockerfile: Dockerfile.nginx
     image: nyr-bingo-nginx:local
     container_name: nyr-bingo-nginx
     volumes:
-      - nyr-bingo.conf:/etc/nginx/conf.d/nyr-bingo.conf:ro
+      - ./nyr-bingo.conf:/etc/nginx/conf.d/nyr-bingo.conf:ro
     ports:
       - "80:80"
       - "443:443"
