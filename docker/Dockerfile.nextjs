@@ -1,0 +1,30 @@
+# Used https://depot.dev/docs/container-builds/optimal-dockerfiles/node-pnpm-dockerfile as starting point
+FROM node:lts-slim AS build
+WORKDIR /app
+
+RUN corepack enable pnpm
+
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+RUN pnpm install
+
+COPY . .
+RUN pnpm run build
+
+FROM node:lts-slim AS runtime
+
+RUN corepack enable pnpm
+
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m -d /app -s /bin/false appuser
+
+WORKDIR /app
+
+COPY --from=build --chown=appuser:appgroup /app ./
+
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--enable-source-maps"
+
+USER appuser
+ENTRYPOINT ["pnpm", "run", "start"]

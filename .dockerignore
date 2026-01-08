@@ -1,0 +1,8 @@
+node_modules/
+.env.example
+.gitignore
+.next
+.github
+.devcontainer
+.idx
+*.md
