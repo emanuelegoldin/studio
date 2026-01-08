@@ -1,11 +1,11 @@
 server {
   listen 80;
-  server_name 127.0.0.1;  # or your public IP for initial testing
+  server_name 127.0.0.1;
 
-  client_max_body_size 6m;     # proof uploads are limited to 5MB in code
+  client_max_body_size 6m;
 
   location / {
-    proxy_pass http://nextjs-app:3000;
+    proxy_pass http://localhost:3000;
 
     # Preserve original request info for the app
     proxy_set_header Host $host;
