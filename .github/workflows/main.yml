@@ -24,3 +24,11 @@ jobs:
         run: docker build -t ghcr.io/${{ github.actor }}/mariadb -f docker/Dockerfile.mariadb .
       - name: Push MariaDB image
         run: docker push ghcr.io/${{ github.actor }}/mariadb:latest
+      - name: Create Nginx image
+        run: docker build -t ghcr.io/${{ github.actor }}/nginx -f docker/Dockerfile.nginx .
+      - name: Push Nginx image
+        run: docker push ghcr.io/${{ github.actor }}/nginx:latest
+      - name: Create Next.js image
+        run: docker build -t ghcr.io/${{ github.actor }}/nextjs-app -f docker/Dockerfile.nextjs .
+      - name: Push MariaDB image
+        run: docker push ghcr.io/${{ github.actor }}/nextjs-app:latest
