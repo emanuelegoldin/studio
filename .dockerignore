@@ -5,5 +5,4 @@ node_modules/
 .github
 .devcontainer
 .idx
-docker/
 *.md
