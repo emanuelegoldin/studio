@@ -1,5 +1,4 @@
 FROM mariadb:11
 
-# Ensure init scripts are baked into the image so they work even when
-# bind-mounts from the devcontainer filesystem are not available to the Docker daemon.
+# Ensure init scripts are baked into the image
 COPY scripts/mariadb-init/ /docker-entrypoint-initdb.d/
