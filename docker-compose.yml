@@ -26,13 +26,13 @@ services:
       timeout: 3s
       retries: 20
   flyway:
-    image: flyway/flyway:11.20.1
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.flyway
+    image: nyr-bingo-flyway:local
     container_name: nyr-bingo-db-migrator
     env_file:
       - .env
-    command: -url=jdbc:mariadb://mariadb:3306/resolution_bingo -user=${DB_USER} -password=${DB_PASSWORD} migrate
-    volumes:
-      - ./db/migrations:/flyway/sql
     depends_on:
       mariadb:
         condition: service_healthy
