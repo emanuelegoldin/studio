@@ -29,10 +29,11 @@ export async function PUT(
     const { cellId } = await params;
     const body = await request.json().catch(() => ({}));
 
-    const resolutionText = typeof body?.resolutionText === 'string' ? body.resolutionText : '';
     const sourceType = body?.sourceType;
     const sourceUserId = typeof body?.sourceUserId === 'string' ? body.sourceUserId : null;
     const isEmpty = Boolean(body?.isEmpty);
+    const resolutionId = typeof body?.resolutionId === 'string' ? body.resolutionId : null;
+    const teamProvidedResolutionId = typeof body?.teamProvidedResolutionId === 'string' ? body.teamProvidedResolutionId : null;
 
     const validSourceTypes = ['team', 'member_provided', 'personal', 'empty'] as const;
     if (!validSourceTypes.includes(sourceType)) {
@@ -42,15 +43,30 @@ export async function PUT(
       );
     }
 
-    if (!resolutionText || resolutionText.trim().length === 0) {
+    if (sourceType === 'personal' && !resolutionId) {
       return NextResponse.json(
-        { error: 'Resolution text is required' },
+        { error: 'resolutionId is required for personal cells' },
+        { status: 400 }
+      );
+    }
+
+    if (sourceType === 'member_provided' && !teamProvidedResolutionId) {
+      return NextResponse.json(
+        { error: 'teamProvidedResolutionId is required for member_provided cells' },
+        { status: 400 }
+      );
+    }
+
+    if (sourceType === 'empty' && !isEmpty) {
+      return NextResponse.json(
+        { error: 'Empty cells must set isEmpty=true' },
         { status: 400 }
       );
     }
 
     const result = await updateCellContent(cellId, currentUser.id, {
-      resolutionText,
+      resolutionId,
+      teamProvidedResolutionId,
       sourceType,
       sourceUserId,
       isEmpty,

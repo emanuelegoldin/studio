@@ -154,6 +154,8 @@ export interface BingoCell {
   id: string;
   cardId: string;
   position: number;
+  resolutionId: string | null;
+  teamProvidedResolutionId: string | null;
   resolutionText: string;
   isJoker: boolean;
   isEmpty: boolean;

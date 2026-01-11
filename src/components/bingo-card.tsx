@@ -27,6 +27,8 @@ interface BingoCell {
   id: string;
   cardId: string;
   position: number;
+  resolutionId?: string | null;
+  teamProvidedResolutionId?: string | null;
   resolutionText: string;
   isJoker: boolean;
   isEmpty: boolean;
@@ -63,6 +65,8 @@ type EditOption = {
   key: string;
   label: string;
   resolutionText: string;
+  resolutionId: string | null;
+  teamProvidedResolutionId: string | null;
   sourceType: 'team' | 'member_provided' | 'personal' | 'empty';
   sourceUserId: string | null;
   isEmpty: boolean;
@@ -178,11 +182,16 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
       if (!isModalOpen || modalMode !== 'edit_cell') return;
       if (!isOwner) return;
 
-      const occupiedTexts = new Set<string>(
+      const occupiedKeys = new Set<string>(
         (Array.isArray(allCells) ? allCells : [])
           .filter((c: BingoCell) => !c.isJoker && !c.isEmpty && c.id !== cell.id)
-          .map((c: BingoCell) => c.resolutionText.trim().toLowerCase())
-          .filter(Boolean)
+          .map((c: BingoCell) => {
+            if (c.sourceType === 'personal' && c.resolutionId) return `personal:${c.resolutionId}`;
+            if (c.sourceType === 'member_provided' && c.teamProvidedResolutionId) return `member_provided:${c.teamProvidedResolutionId}`;
+            // "team" and "empty" cells do not have a stable resolution id reference.
+            return null;
+          })
+          .filter((v: string | null): v is string => typeof v === 'string' && v.length > 0)
       );
 
       setIsEditOptionsLoading(true);
@@ -212,13 +221,15 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
           key: `personal:${r.id}`,
           label: r.text,
           resolutionText: r.text,
+          resolutionId: typeof r.id === 'string' ? r.id : null,
+          teamProvidedResolutionId: null,
           sourceType: 'personal',
           sourceUserId: currentUserId ?? null,
           isEmpty: false,
         }))
           // Prevent duplicates: do not allow selecting texts already used in other non-empty cells
           // Spec: 05-bingo-card-generation.md - No duplicates in a card
-          .filter((opt: EditOption) => !occupiedTexts.has(opt.resolutionText.trim().toLowerCase()));
+          .filter((opt: EditOption) => !occupiedKeys.has(opt.key));
 
         let teamOptions: EditOption[] = [];
         if (teamRes) {
@@ -237,12 +248,14 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
             key: `member_provided:${r.id}`,
             label: r.text,
             resolutionText: r.text,
+            resolutionId: null,
+            teamProvidedResolutionId: typeof r.id === 'string' ? r.id : null,
             sourceType: 'member_provided',
             sourceUserId: typeof r.fromUserId === 'string' ? r.fromUserId : null,
             isEmpty: false,
           }))
             // Prevent duplicates: do not allow selecting texts already used in other non-empty cells
-            .filter((opt: EditOption) => !occupiedTexts.has(opt.resolutionText.trim().toLowerCase()));
+            .filter((opt: EditOption) => !occupiedKeys.has(opt.key));
 
           // Best-effort: fetch usernames for providers
           const providerIds = Array.from(
@@ -522,7 +535,8 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          resolutionText: opt.resolutionText,
+          resolutionId: opt.resolutionId,
+          teamProvidedResolutionId: opt.teamProvidedResolutionId,
           sourceType: opt.sourceType,
           sourceUserId: opt.sourceUserId,
           isEmpty: opt.isEmpty,

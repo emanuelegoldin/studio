@@ -222,10 +222,23 @@ export async function getPendingProofsForTeam(
   excludeUserId?: string
 ): Promise<(CellProof & { cardUserId: string; cellResolutionText: string })[]> {
   let sql = `
-    SELECT p.*, bc.user_id as card_user_id, c.resolution_text as cell_resolution_text
+    SELECT
+      p.*,
+      bc.user_id as card_user_id,
+      CASE
+        WHEN c.is_empty THEN 'Empty'
+        WHEN c.is_joker THEN 'Joker'
+        WHEN c.source_type = 'team' THEN COALESCE(t.team_resolution_text, 'Team Goal')
+        WHEN c.team_provided_resolution_id IS NOT NULL THEN tpr.text
+        WHEN c.resolution_id IS NOT NULL THEN r.text
+        ELSE ''
+      END as cell_resolution_text
     FROM cell_proofs p
     JOIN bingo_cells c ON p.cell_id = c.id
     JOIN bingo_cards bc ON c.card_id = bc.id
+    JOIN teams t ON bc.team_id = t.id
+    LEFT JOIN resolutions r ON c.resolution_id = r.id
+    LEFT JOIN team_provided_resolutions tpr ON c.team_provided_resolution_id = tpr.id
     WHERE bc.team_id = ? AND p.status = 'pending'
   `;
   const params: unknown[] = [teamId];
