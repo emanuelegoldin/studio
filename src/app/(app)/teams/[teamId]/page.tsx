@@ -471,7 +471,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {isLeader && team.status === 'forming' && (
+            {isLeader && (
               <>
                 <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                   <DialogTrigger asChild>
