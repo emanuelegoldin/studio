@@ -19,7 +19,7 @@ import {
  * Returns resolutions created by the user and for the user
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
@@ -34,6 +34,10 @@ export async function GET(
 
     const { teamId } = await params;
 
+    // Optional query: return resolutions targeted to a given toUserId
+    // Spec: 09-bingo-card-editing.md - Replacement Options
+    const toUserId = request.nextUrl.searchParams.get('toUserId');
+
     // Check if user is a member
     const isMember = await isTeamMember(teamId, currentUser.id);
     if (!isMember) {
@@ -41,6 +45,11 @@ export async function GET(
         { error: 'You are not a member of this team' },
         { status: 403 }
       );
+    }
+
+    if (toUserId) {
+      const resolutions = await getTeamProvidedResolutionsForUser(teamId, toUserId);
+      return NextResponse.json({ resolutions });
     }
 
     // Get resolutions created by the user

@@ -599,7 +599,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                   <DialogHeader>
                     <DialogTitle>Propose Resolutions</DialogTitle>
                     <DialogDescription>
-                      Create a resolution for each team member.
+                      Create or update a resolution for each team member. You can do this at any time.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
@@ -627,7 +627,6 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            )}
           </div>
         </CardHeader>
       </Card>
@@ -673,6 +672,8 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                       <BingoCard 
                         cells={card.cells} 
                         isOwner={isCurrentUser}
+                        teamId={team.id}
+                        currentUserId={currentUserId}
                         onCellUpdate={isCurrentUser ? handleCellUpdate : undefined}
                         onRefresh={reloadCards}
                       />

@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Star, Check, Hourglass, ThumbsUp, X } from "lucide-react";
+import { Star, Check, Hourglass, ThumbsUp, X, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -18,6 +18,7 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ReviewFile, ReviewMessage, ReviewThreadWithDetails } from "@/lib/db";
@@ -42,6 +43,10 @@ interface BingoCell {
 interface BingoSquareProps {
   cell: BingoCell;
   isOwner: boolean;
+  editMode?: boolean;
+  teamId?: string;
+  currentUserId?: string;
+  allCells?: BingoCell[];
   onUpdate?: (cellId: string, newState: 'pending' | 'completed') => void;
   onRefresh?: () => void;
 }
@@ -54,9 +59,18 @@ const stateConfig = {
   declined: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
 };
 
-function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
+type EditOption = {
+  key: string;
+  label: string;
+  resolutionText: string;
+  sourceType: 'team' | 'member_provided' | 'personal' | 'empty';
+  sourceUserId: string | null;
+  isEmpty: boolean;
+};
+
+function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, allCells, onUpdate, onRefresh }: BingoSquareProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | null>(null);
+  const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | null>(null);
   const { toast } = useToast();
   const [usernames, setUsernames] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -64,6 +78,9 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
   const [messageDraft, setMessageDraft] = useState('');
   const [thread, setThread] = useState<ReviewThreadWithDetails | null>(null);
   const [isThreadLoading, setIsThreadLoading] = useState(false);
+  const [isEditOptionsLoading, setIsEditOptionsLoading] = useState(false);
+  const [editOptions, setEditOptions] = useState<EditOption[]>([]);
+  const [editFilter, setEditFilter] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Determine visual state based on cell state and proof status
@@ -79,12 +96,20 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
   // - Empty filler cells are not checkable
   // - Joker cell is informational only
   const isCheckable = !cell.isJoker && !cell.isEmpty;
+  // Spec: 09-bingo-card-editing.md - In edit mode, any non-joker cell is selectable (including empty)
+  const canEditContent = Boolean(editMode && isOwner && !cell.isJoker);
   const canInteract =
-    isCheckable &&
-    (isOwner || cell.state === 'completed' || cell.state === 'pending_review');
+    canEditContent ||
+    (isCheckable && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'));
 
   const handleClick = () => {
     if (!canInteract) return;
+
+    if (canEditContent) {
+      setModalMode('edit_cell');
+      setIsModalOpen(true);
+      return;
+    }
 
     if (isOwner) {
       if (cell.state === 'pending') {
@@ -140,10 +165,123 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
       setMessageDraft('');
       setThread(null);
       setIsThreadLoading(false);
+      setIsEditOptionsLoading(false);
+      setEditOptions([]);
+      setEditFilter('');
       setModalMode(null);
       setIsSubmitting(false);
     }
   }, [isModalOpen]);
+
+  useEffect(() => {
+    const loadEditOptions = async () => {
+      if (!isModalOpen || modalMode !== 'edit_cell') return;
+      if (!isOwner) return;
+
+      const occupiedTexts = new Set<string>(
+        (Array.isArray(allCells) ? allCells : [])
+          .filter((c: BingoCell) => !c.isJoker && !c.isEmpty && c.id !== cell.id)
+          .map((c: BingoCell) => c.resolutionText.trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      setIsEditOptionsLoading(true);
+      try {
+        const personalReq = fetch('/api/resolutions');
+        const teamReq = teamId && currentUserId
+          ? fetch(`/api/teams/${teamId}/resolutions?toUserId=${encodeURIComponent(currentUserId)}`)
+          : null;
+
+        const [personalRes, teamRes] = await Promise.all([
+          personalReq,
+          teamReq ?? Promise.resolve(null as unknown as Response | null),
+        ]);
+
+        const personalData = await personalRes.json().catch(() => ({}));
+        if (!personalRes.ok) {
+          toast({
+            title: 'Error',
+            description: personalData?.error || 'Failed to load personal resolutions',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const personalOptions: EditOption[] = (personalData?.resolutions || [])
+          .map((r: any) => ({
+          key: `personal:${r.id}`,
+          label: r.text,
+          resolutionText: r.text,
+          sourceType: 'personal',
+          sourceUserId: currentUserId ?? null,
+          isEmpty: false,
+        }))
+          // Prevent duplicates: do not allow selecting texts already used in other non-empty cells
+          // Spec: 05-bingo-card-generation.md - No duplicates in a card
+          .filter((opt: EditOption) => !occupiedTexts.has(opt.resolutionText.trim().toLowerCase()));
+
+        let teamOptions: EditOption[] = [];
+        if (teamRes) {
+          const teamData = await teamRes.json().catch(() => ({}));
+          if (!teamRes.ok) {
+            toast({
+              title: 'Error',
+              description: teamData?.error || 'Failed to load team-provided resolutions',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          teamOptions = (teamData?.resolutions || [])
+            .map((r: any) => ({
+            key: `member_provided:${r.id}`,
+            label: r.text,
+            resolutionText: r.text,
+            sourceType: 'member_provided',
+            sourceUserId: typeof r.fromUserId === 'string' ? r.fromUserId : null,
+            isEmpty: false,
+          }))
+            // Prevent duplicates: do not allow selecting texts already used in other non-empty cells
+            .filter((opt: EditOption) => !occupiedTexts.has(opt.resolutionText.trim().toLowerCase()));
+
+          // Best-effort: fetch usernames for providers
+          const providerIds = Array.from(
+            new Set<string>(
+              (teamData?.resolutions || [])
+                .map((r: any) => r?.fromUserId)
+                .filter((v: any): v is string => typeof v === 'string')
+            )
+          );
+
+          const missing = providerIds.filter((id) => !usernames[id]);
+          await Promise.all(missing.map(async (id) => {
+            try {
+              const res = await fetch(`/api/users/${id}`);
+              if (!res.ok) return;
+              const data = await res.json();
+              if (data?.username) setUsernames(prev => ({ ...prev, [id]: data.username }));
+            } catch {
+              // ignore
+            }
+          }));
+        }
+
+        setEditOptions([...teamOptions, ...personalOptions]);
+      } catch {
+        toast({
+          title: 'Error',
+          description: 'Failed to load replacement options',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsEditOptionsLoading(false);
+      }
+    };
+
+    loadEditOptions();
+    // usernames is intentionally not a dependency to avoid re-loading options on username updates
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isModalOpen, modalMode, isOwner, teamId, currentUserId, cell.id, allCells, toast]);
 
   useEffect(() => {
     // When a thread is loaded, fetch author usernames for its messages
@@ -375,6 +513,44 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
     }
   };
 
+  const handleSelectReplacement = async (opt: EditOption) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/cells/${cell.id}/edit`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resolutionText: opt.resolutionText,
+          sourceType: opt.sourceType,
+          sourceUserId: opt.sourceUserId,
+          isEmpty: opt.isEmpty,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: 'Error',
+          description: data?.error || 'Failed to update cell',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Cell updated',
+        description: 'The bingo card has been updated.',
+      });
+
+      setIsModalOpen(false);
+      onRefresh?.();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <>
       <button
@@ -441,7 +617,70 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
                 </DialogDescription>
               </>
             )}
+
+            {modalMode === 'edit_cell' && (
+              <>
+                <DialogTitle className="font-headline">Edit Cell</DialogTitle>
+                <DialogDescription>
+                  Choose a replacement resolution for this cell.
+                </DialogDescription>
+              </>
+            )}
           </DialogHeader>
+
+          {modalMode === 'edit_cell' && (
+            <div className="space-y-3 py-4">
+              <Input
+                placeholder="Filter resolutions…"
+                value={editFilter}
+                onChange={(e) => setEditFilter(e.target.value)}
+                disabled={isSubmitting || isEditOptionsLoading}
+              />
+
+              {isEditOptionsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading options…
+                </div>
+              ) : (
+                <div className="max-h-72 overflow-y-auto rounded-md border p-2 space-y-2">
+                  {editOptions
+                    .filter((opt) => {
+                      const q = editFilter.trim().toLowerCase();
+                      if (!q) return true;
+                      return opt.label.toLowerCase().includes(q);
+                    })
+                    .map((opt) => {
+                      const isMemberProvided = opt.sourceType === 'member_provided';
+                      const providerName = opt.sourceUserId ? (usernames[opt.sourceUserId] ?? 'Team member') : null;
+                      return (
+                        <button
+                          key={opt.key}
+                          onClick={() => handleSelectReplacement(opt)}
+                          disabled={isSubmitting}
+                          className={cn(
+                            'w-full text-left rounded-md border px-3 py-2 text-sm hover:bg-secondary/50 transition-colors',
+                            isSubmitting ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-medium leading-snug">{opt.label}</p>
+                            <Badge variant="outline" className="shrink-0">
+                              {isMemberProvided ? (providerName ?? 'Member') : 'Personal'}
+                            </Badge>
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                  {editOptions.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No options available.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {modalMode === 'thread' && (
             <div className="space-y-4 py-4">
               {isThreadLoading ? (
@@ -580,25 +819,54 @@ function BingoSquare({ cell, isOwner, onUpdate, onRefresh }: BingoSquareProps) {
 interface BingoCardProps {
   cells: BingoCell[];
   isOwner?: boolean;
+  teamId?: string;
+  currentUserId?: string;
   onCellUpdate?: (cellId: string, newState: 'pending' | 'completed') => void;
   onRefresh?: () => void;
 }
 
-export function BingoCard({ cells, isOwner = false, onCellUpdate, onRefresh }: BingoCardProps) {
+export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCellUpdate, onRefresh }: BingoCardProps) {
   // Sort cells by position
   const sortedCells = [...cells].sort((a, b) => a.position - b.position);
+  const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    // Safety: cannot stay in edit mode when not the owner
+    if (!isOwner) setEditMode(false);
+  }, [isOwner]);
 
   return (
-    <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
-      {sortedCells.map((cell) => (
-        <BingoSquare 
-          key={cell.id} 
-          cell={cell} 
-          isOwner={isOwner}
-          onUpdate={onCellUpdate}
-          onRefresh={onRefresh}
-        />
-      ))}
+    <div className="space-y-3">
+      {isOwner && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            {editMode ? 'Edit mode: select a cell to replace it.' : ''}
+          </p>
+          <Button
+            variant={editMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setEditMode((v) => !v)}
+          >
+            {editMode ? 'Done' : 'Edit Card'}
+          </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
+        {sortedCells.map((cell) => (
+          <BingoSquare 
+            key={cell.id} 
+            cell={cell} 
+            isOwner={isOwner}
+            editMode={editMode}
+            teamId={teamId}
+            currentUserId={currentUserId}
+            allCells={sortedCells}
+            onUpdate={onCellUpdate}
+            onRefresh={onRefresh}
+          />
+        ))}
+      </div>
     </div>
   );
 }

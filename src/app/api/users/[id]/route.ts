@@ -3,7 +3,10 @@ import { NextResponse } from 'next/server';
 import { findUserById } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const currentUser = await getCurrentUser();
         

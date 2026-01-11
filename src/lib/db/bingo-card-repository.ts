@@ -468,6 +468,74 @@ export async function updateCellState(
   return { success: true, cell: rowToCell(updatedRows[0]) };
 }
 
+export async function updateCellContent(
+  cellId: string,
+  userId: string,
+  update: {
+    resolutionText: string;
+    sourceType: CellSourceType;
+    sourceUserId: string | null;
+    isEmpty: boolean;
+  }
+): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+
+  const resolutionText = update.resolutionText?.trim();
+  if (!resolutionText) {
+    return { success: false, error: 'Resolution text is required' };
+  }
+
+  // Get the cell (and card owner) for authorization and joker protection
+  const cellRows = await query<(CellRow & { card_user_id: string })[]>(
+    `SELECT c.*, bc.user_id as card_user_id
+     FROM bingo_cells c
+     JOIN bingo_cards bc ON c.card_id = bc.id
+     WHERE c.id = ?`,
+    [cellId]
+  );
+
+  if (cellRows.length === 0) {
+    return { success: false, error: 'Cell not found' };
+  }
+
+  const cell = cellRows[0];
+
+  if (cell.card_user_id !== userId) {
+    return { success: false, error: 'Only the card owner can edit cell content' };
+  }
+
+  // Spec: 05-bingo-card-generation.md, 09-bingo-card-editing.md - Joker cell is immutable
+  if (cell.is_joker) {
+    return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
+  // Keep empty flag consistent with source type
+  if (update.isEmpty && update.sourceType !== 'empty') {
+    return { success: false, error: 'Empty cells must have sourceType "empty"' };
+  }
+  if (!update.isEmpty && update.sourceType === 'empty') {
+    return { success: false, error: 'Non-empty cells cannot have sourceType "empty"' };
+  }
+
+  const sourceUserId = update.sourceUserId ? update.sourceUserId : null;
+
+  await query(
+    `UPDATE bingo_cells
+     SET resolution_text = ?,
+         source_type = ?,
+         source_user_id = ?,
+         is_empty = ?,
+         state = 'pending'
+     WHERE id = ?`,
+    [resolutionText, update.sourceType, sourceUserId, update.isEmpty, cellId]
+  );
+
+  const updatedRows = await query<CellRow[]>(
+    `SELECT * FROM bingo_cells WHERE id = ?`,
+    [cellId]
+  );
+
+  return { success: true, cell: rowToCell(updatedRows[0]) };
+}
 /**
  * Undo completion - revert cell to pending and close any open thread
  * Spec: Resolution Review & Proof Workflow - Undo Completion
