@@ -14,6 +14,8 @@ Support team-based bingo gameplay with invitations, membership, and shared resol
 - Define a team resolution
 - Create resolutions for other team members
 - Start bingo once setup is complete
+- Join a team even after the game has started
+- Update member-provided resolutions at any time
 
 ---
 
@@ -26,6 +28,8 @@ Support team-based bingo gameplay with invitations, membership, and shared resol
 - Team resolution definition
 - Member-provided resolutions
 - Bingo start conditions
+- Joining after game start
+- Ongoing member-provided resolutions after game start
 - Verification-based access restrictions
 
 ---
@@ -70,6 +74,14 @@ Unverified users:
 - Only verified users can accept invitations and join teams.
 - Invitation mechanism is implementation-defined.
 
+#### Joining After Start
+
+- A verified user MAY join a team even after the team status is `started`.
+- If a user joins a team after it has started:
+  - The team remains in `started` status.
+  - The new member MUST receive a bingo card for the started team.
+  - Member-provided resolutions for the new member become required as described below.
+
 ---
 
 ### Team Resolution (Joker Cell)
@@ -86,6 +98,17 @@ Unverified users:
   - Each member must create a resolution for every **other** member.
 - Members cannot create a resolution for themselves unless explicitly allowed by future specs.
 
+#### Ongoing Updates
+
+- Team members MAY create or update their member-provided resolutions at any time (both before and after game start).
+- Updating a member-provided resolution overwrites the previous text for the same `(team_id, from_user_id, to_user_id)`.
+
+#### New Member Effects
+
+- When a new member joins a team (including after start), the required set of member-provided resolutions expands:
+  - Each existing member must provide one resolution for the new member.
+  - The new member must provide one resolution for each existing member.
+
 ---
 
 ### Start Conditions
@@ -93,6 +116,8 @@ Unverified users:
 - Team leader may start bingo only when:
   - All team members have provided resolutions for every other member
   - All participating members are verified
+
+Note: These conditions apply at the time the leader starts the game. After the game has started, new members may join, which introduces new required member-provided resolutions for the expanded membership.
 
 ---
 
