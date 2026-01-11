@@ -508,6 +508,11 @@ export async function updateCellContent(
     return { success: false, error: 'Joker cell cannot be modified' };
   }
 
+  // Team resolution cells are immutable (same as Joker for edit-card flow)
+  if (cell.source_type === 'team') {
+    return { success: false, error: 'Team resolution cell cannot be modified' };
+  }
+
   // Keep empty flag consistent with source type
   if (update.isEmpty && update.sourceType !== 'empty') {
     return { success: false, error: 'Empty cells must have sourceType "empty"' };

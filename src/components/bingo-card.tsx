@@ -97,7 +97,7 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
   // - Joker cell is informational only
   const isCheckable = !cell.isJoker && !cell.isEmpty;
   // Spec: 09-bingo-card-editing.md - In edit mode, any non-joker cell is selectable (including empty)
-  const canEditContent = Boolean(editMode && isOwner && !cell.isJoker);
+  const canEditContent = Boolean(editMode && isOwner && !cell.isJoker && cell.sourceType !== 'team');
   const canInteract =
     canEditContent ||
     (isCheckable && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'));
