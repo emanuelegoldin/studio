@@ -9,6 +9,8 @@ services:
       #   MARIADB_PORT: ${DB_PORT:-3306}
     image: nyr-bingo-mariadb:local
     container_name: nyr-bingo-mariadb
+    ports:
+      - "3306:3306"
     env_file:
       - .env
     environment:
@@ -23,6 +25,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  flyway:
+    image: flyway/flyway:11.20.1
+    container_name: nyr-bingo-db-migrator
+    env_file:
+      - .env
+    command: -url=jdbc:mariadb://mariadb:3306/resolution_bingo -user=${DB_USER} -password=${DB_PASSWORD} migrate
+    volumes:
+      - ./db/migrations:/flyway/sql
+    depends_on:
+      mariadb:
+        condition: service_healthy
   nextjs-app:
     build:
       context: .
