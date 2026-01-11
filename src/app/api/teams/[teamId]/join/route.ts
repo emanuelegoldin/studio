@@ -61,7 +61,13 @@ export async function POST(
 
     // Spec: 04-bingo-teams.md - Joining After Start
     if (result.team?.status === 'started') {
-      await ensureBingoCardForUser(result.team.id, currentUser.id);
+      const cardResult = await ensureBingoCardForUser(result.team.id, currentUser.id);
+      if (cardResult && 'error' in cardResult && cardResult.error) {
+        return NextResponse.json(
+          { error: cardResult.error },
+          { status: 400 }
+        );
+      }
     }
 
     return NextResponse.json({ 
