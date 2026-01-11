@@ -3,6 +3,8 @@
 ## Purpose
 Allow a card owner to update the *content* of a generated bingo card after the game has started, by replacing any non-joker cell with a compatible resolution.
 
+Team resolution cells are not editable in this flow.
+
 This spec defines:
 - UI edit mode behavior
 - Allowed replacement sources
@@ -38,8 +40,9 @@ This spec defines:
 - While in edit mode, the user SHALL be able to exit edit mode when finished.
 
 ### 2) Selectable Cells in Edit Mode
-- While in edit mode, the card owner SHALL be able to select **any non-joker cell**, including empty filler cells.
+- While in edit mode, the card owner SHALL be able to select **any non-joker, non-team cell**, including empty filler cells.
 - The joker (center) cell SHALL NOT be modifiable.
+- A team resolution cell (`source_type = 'team'`) SHALL NOT be modifiable.
 
 ### 3) Replacement Options
 Upon selecting a cell, the user SHALL be prompted with a list of replacement options consisting of:
@@ -58,30 +61,45 @@ Upon selecting a cell, the user SHALL be prompted with a list of replacement opt
 When a replacement option is selected:
 - The system SHALL update the selected cell via `PUT /api/cells/[cellId]/edit`.
 - The system SHALL update **all** of the following fields based on the selected option:
-  - `bingo_cells.resolution_text`
+  - `bingo_cells.resolution_id`
+  - `bingo_cells.team_provided_resolution_id`
   - `bingo_cells.source_type`
   - `bingo_cells.source_user_id`
   - `bingo_cells.is_empty`
 - The system SHALL also reset `bingo_cells.state` to `pending`.
 - If the selected option has no source user id, the system SHALL store `NULL` in `source_user_id`.
 
+ID storage rules:
+- If `source_type = 'personal'`, the system SHALL set `resolution_id` and SHALL set `team_provided_resolution_id` to `NULL`.
+- If `source_type = 'member_provided'`, the system SHALL set `team_provided_resolution_id` and SHALL set `resolution_id` to `NULL`.
+- If `source_type = 'empty'`, the system SHALL set both `resolution_id` and `team_provided_resolution_id` to `NULL`.
+
 ### 6) Permissions & Safety
 - Only the card owner SHALL be able to edit the content of cells on their card.
 - Attempts to edit the joker cell SHALL fail.
+- Attempts to edit a team resolution cell SHALL fail.
 
 ## Backend Rules
 
 ### `PUT /api/cells/[cellId]/edit`
 Request body (JSON):
-- `resolutionText: string` (required, non-empty)
+- `resolutionId: string | null` (optional)
+- `teamProvidedResolutionId: string | null` (optional)
 - `sourceType: 'team' | 'member_provided' | 'personal' | 'empty'` (required)
 - `sourceUserId: string | null` (optional; when omitted or null -> stored as NULL)
 - `isEmpty: boolean` (required)
+
+Request constraints:
+- `sourceType = 'team'` SHALL be rejected for this endpoint.
+- If `sourceType = 'personal'`, `resolutionId` is required and `teamProvidedResolutionId` MUST be null/omitted.
+- If `sourceType = 'member_provided'`, `teamProvidedResolutionId` is required and `resolutionId` MUST be null/omitted.
+- If `sourceType = 'empty'`, both IDs MUST be null/omitted.
 
 Validation:
 - Auth required
 - The authenticated user MUST be the card owner for the specified cell
 - The specified cell MUST NOT be a joker cell
+- The specified cell MUST NOT be a team resolution cell
 
 Effects:
 - Update the cell content fields and set state to `pending`
@@ -93,11 +111,12 @@ Effects:
 
 ## Acceptance Criteria
 - A card owner can enter and exit edit mode.
-- In edit mode, the owner can select any non-joker cell (including empty).
+- In edit mode, the owner can select any non-joker, non-team cell (including empty).
 - On selection, the UI shows a list combining:
   - `GET /api/resolutions`
   - `GET /api/teams/[teamId]/resolutions?toUserId=<currentUserId>`
 - Selecting an option updates the cell via `PUT /api/cells/[cellId]/edit`.
 - Cancelling returns to the card still in edit mode.
 - The joker cell cannot be modified (both UI and API enforce this).
-- On edit, the cell updates `resolution_text`, `source_type`, `source_user_id` (NULL when absent), `is_empty`, and resets state to `pending`.
+- The team resolution cell cannot be modified (both UI and API enforce this).
+- On edit, the cell updates `resolution_id`/`team_provided_resolution_id`, `source_type`, `source_user_id` (NULL when absent), `is_empty`, and resets state to `pending`.
