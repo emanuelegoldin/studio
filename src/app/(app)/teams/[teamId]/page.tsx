@@ -583,8 +583,13 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {team.status === 'forming' && (
-              <Dialog open={memberResolutionsOpen} onOpenChange={setMemberResolutionsOpen}>
+            <Dialog
+              open={memberResolutionsOpen}
+              onOpenChange={(open) => {
+                setMemberResolutionsOpen(open);
+                if (open) loadTeam();
+              }}
+            >
                 <DialogTrigger asChild>
                   <Button variant="outline">
                     <Send className="h-4 w-4 mr-2"/> Propose Resolutions

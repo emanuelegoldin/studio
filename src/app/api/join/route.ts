@@ -4,8 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
-import { joinTeamByInviteCode, getTeamWithMembers } from '@/lib/db';
+import { getCurrentUser, isUserVerified } from '@/lib/auth';
+import { joinTeamByInviteCode, getTeamWithMembers, ensureBingoCardForUser } from '@/lib/db';
 
 /**
  * POST /api/join - Join a team using invite code
@@ -19,6 +19,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Spec: 04-bingo-teams.md - Verification Requirement
+    if (!isUserVerified(currentUser)) {
+      return NextResponse.json(
+        { error: 'Email verification required. Please verify your email before joining a team.' },
+        { status: 403 }
       );
     }
 
@@ -45,6 +53,11 @@ export async function POST(request: NextRequest) {
     const teamWithMembers = result.team 
       ? await getTeamWithMembers(result.team.id)
       : null;
+
+    // Spec: 04-bingo-teams.md - Joining After Start
+    if (result.team?.status === 'started') {
+      await ensureBingoCardForUser(result.team.id, currentUser.id);
+    }
 
     return NextResponse.json({ 
       message: 'Successfully joined the team',

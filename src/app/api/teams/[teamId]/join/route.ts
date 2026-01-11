@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, isUserVerified } from '@/lib/auth';
-import { joinTeamByInviteCode, getTeamWithMembers } from '@/lib/db';
+import { joinTeamByInviteCode, getTeamWithMembers, ensureBingoCardForUser } from '@/lib/db';
 
 /**
  * POST /api/teams/[teamId]/join - Join a team using invite code
@@ -58,6 +58,11 @@ export async function POST(
     const teamWithMembers = result.team 
       ? await getTeamWithMembers(result.team.id)
       : null;
+
+    // Spec: 04-bingo-teams.md - Joining After Start
+    if (result.team?.status === 'started') {
+      await ensureBingoCardForUser(result.team.id, currentUser.id);
+    }
 
     return NextResponse.json({ 
       message: 'Successfully joined the team',

@@ -307,6 +307,50 @@ export async function getBingoCard(
 }
 
 /**
+ * Ensure a user has a bingo card for a started team.
+ * Spec: 04-bingo-teams.md - Joining After Start
+ */
+export async function ensureBingoCardForUser(
+  teamId: string,
+  userId: string
+): Promise<{ created: boolean; card?: BingoCard; error?: string }> {
+  const existing = await query<CardRow[]>(
+    `SELECT * FROM bingo_cards WHERE team_id = ? AND user_id = ? LIMIT 1`,
+    [teamId, userId]
+  );
+
+  if (existing.length > 0) {
+    return { created: false, card: rowToCard(existing[0]) };
+  }
+
+  const team = await getTeamById(teamId);
+  if (!team) {
+    return { created: false, error: 'Team not found' };
+  }
+
+  if (team.status !== 'started') {
+    return { created: false, error: 'Team is not started' };
+  }
+
+  if (!team.teamResolutionText) {
+    return { created: false, error: 'Team resolution must be set' };
+  }
+
+  const connection = await getConnection();
+  try {
+    await connection.beginTransaction();
+    const card = await generateCardForUser(connection, teamId, userId, team.teamResolutionText);
+    await connection.commit();
+    return { created: true, card };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Get bingo card by ID
  */
 export async function getBingoCardById(cardId: string): Promise<BingoCardWithCells | null> {
