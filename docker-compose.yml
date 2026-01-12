@@ -33,6 +33,12 @@ services:
     container_name: nyr-bingo-db-migrator
     env_file:
       - .env
+    command: >
+      -url=jdbc:mariadb://mariadb:3306/resolution_bingo
+      -user=${DB_USER}
+      -password=${DB_PASSWORD}
+      -baselineOnMigrate=true
+      migrate
     depends_on:
       mariadb:
         condition: service_healthy

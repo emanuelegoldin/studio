@@ -1,5 +1,3 @@
 FROM flyway/flyway:11.20.1
 
-COPY ./database/migrations ./flyway/sql
-
-CMD ["-url=jdbc:mariadb://nyr-bingo-mariadb:3306/nyr_bingo","-user=${DB_USER:-root}","-password=${DB_PASSWORD:-example}","-baselineOnMigrate=true","migrate"]
+COPY ./database/migrations ./sql
