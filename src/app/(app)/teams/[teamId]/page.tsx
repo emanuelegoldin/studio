@@ -471,7 +471,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {isLeader && team.status === 'forming' && (
+            {isLeader && (
               <>
                 <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
                   <DialogTrigger asChild>
@@ -583,8 +583,13 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            {team.status === 'forming' && (
-              <Dialog open={memberResolutionsOpen} onOpenChange={setMemberResolutionsOpen}>
+            <Dialog
+              open={memberResolutionsOpen}
+              onOpenChange={(open) => {
+                setMemberResolutionsOpen(open);
+                if (open) loadTeam();
+              }}
+            >
                 <DialogTrigger asChild>
                   <Button variant="outline">
                     <Send className="h-4 w-4 mr-2"/> Propose Resolutions
@@ -594,7 +599,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                   <DialogHeader>
                     <DialogTitle>Propose Resolutions</DialogTitle>
                     <DialogDescription>
-                      Create a resolution for each team member.
+                      Create or update a resolution for each team member. You can do this at any time.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
@@ -622,7 +627,6 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-            )}
           </div>
         </CardHeader>
       </Card>
@@ -668,6 +672,8 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
                       <BingoCard 
                         cells={card.cells} 
                         isOwner={isCurrentUser}
+                        teamId={team.id}
+                        currentUserId={currentUserId}
                         onCellUpdate={isCurrentUser ? handleCellUpdate : undefined}
                         onRefresh={reloadCards}
                       />

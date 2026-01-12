@@ -63,7 +63,9 @@ Agents MUST enforce the following domain invariants:
 - Bingo cards:
   - Have a fixed size
   - Include a Joker in the center with the team resolution
-  - Are generated once and immutable afterward (except state updates)
+  - Can be updated by the user
+    - Cells can be replaced with a compatible resolution (personal resolution or a resolution provided by a team member)
+    - Edits to resolutions existing in a card shall be reflected in the card
 - Duplicate resolutions in a bingo card:
   - Can be reported
   - Must be replaced according to the spec rules

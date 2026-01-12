@@ -42,3 +42,7 @@ jobs:
         run: docker build -t ghcr.io/${{ github.actor }}/nextjs-app -f docker/Dockerfile.nextjs .
       - name: Push Next.js image
         run: docker push ghcr.io/${{ github.actor }}/nextjs-app:latest
+      - name: Create Flyway image
+        run: docker build -t ghcr.io/${{ github.actor }}/flyway -f docker/Dockerfile.flyway .
+      - name: Push Flyway image
+        run: docker push ghcr.io/${{ github.actor }}/flyway:latest

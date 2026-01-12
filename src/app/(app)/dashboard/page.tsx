@@ -230,6 +230,8 @@ export default function DashboardPage() {
             <BingoCard 
               cells={card.cells} 
               isOwner={true}
+              teamId={team.id}
+              currentUserId={currentUserId}
               onCellUpdate={(cellId, newState) => handleCellUpdate(team.id, cellId, newState)}
               onRefresh={() => reloadCardForTeam(team.id)}
             />

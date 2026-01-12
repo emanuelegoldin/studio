@@ -31,8 +31,10 @@ interface CellRow {
   id: string;
   card_id: string;
   position: number;
+  resolution_id: string | null;
+  team_provided_resolution_id: string | null;
+  // Derived display text (resolved from joins)
   resolution_text: string;
-  is_joker: boolean | number;
   is_empty: boolean | number;
   source_type: CellSourceType;
   source_user_id: string | null;
@@ -67,8 +69,11 @@ function rowToCell(row: CellRow): BingoCell {
     id: row.id,
     cardId: row.card_id,
     position: row.position,
+    resolutionId: row.resolution_id,
+    teamProvidedResolutionId: row.team_provided_resolution_id,
     resolutionText: row.resolution_text,
-    isJoker: Boolean(row.is_joker),
+    // Spec: 05-bingo-card-generation.md - Joker is implicit and not stored in the DB.
+    isJoker: false,
     isEmpty: Boolean(row.is_empty),
     sourceType: row.source_type,
     sourceUserId: row.source_user_id,
@@ -76,6 +81,42 @@ function rowToCell(row: CellRow): BingoCell {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+const SELECT_CELL_WITH_RESOLVED_TEXT = `
+  SELECT
+    c.id,
+    c.card_id,
+    c.position,
+    c.resolution_id,
+    c.team_provided_resolution_id,
+    CASE
+      WHEN c.is_empty THEN 'Empty'
+      WHEN c.source_type = 'team' THEN COALESCE(t.team_resolution_text, 'Team Goal')
+      WHEN c.team_provided_resolution_id IS NOT NULL THEN tpr.text
+      WHEN c.resolution_id IS NOT NULL THEN r.text
+      ELSE ''
+    END AS resolution_text,
+    c.is_empty,
+    c.source_type,
+    c.source_user_id,
+    c.state,
+    c.created_at,
+    c.updated_at
+  FROM bingo_cells c
+  JOIN bingo_cards bc ON c.card_id = bc.id
+  JOIN teams t ON bc.team_id = t.id
+  LEFT JOIN resolutions r ON c.resolution_id = r.id
+  LEFT JOIN team_provided_resolutions tpr ON c.team_provided_resolution_id = tpr.id
+`;
+
+async function getResolvedCellRowById(cellId: string): Promise<CellRow | null> {
+  const rows = await query<CellRow[]>(
+    `${SELECT_CELL_WITH_RESOLVED_TEXT}
+     WHERE c.id = ?`,
+    [cellId]
+  );
+  return rows.length > 0 ? rows[0] : null;
 }
 
 function rowToProof(row: ProofRow): CellProof {
@@ -160,6 +201,8 @@ async function generateCardForUser(
   // Collect resolution texts with source info
   const cellData: {
     text: string;
+    resolutionId: string | null;
+    teamProvidedResolutionId: string | null;
     sourceType: CellSourceType;
     sourceUserId: string | null;
     isJoker: boolean;
@@ -176,6 +219,8 @@ async function generateCardForUser(
     if (!usedTexts.has(res.text.toLowerCase())) {
       cellData.push({
         text: res.text,
+        resolutionId: null,
+        teamProvidedResolutionId: res.id,
         sourceType: 'member_provided',
         sourceUserId: res.fromUserId,
         isJoker: false,
@@ -189,6 +234,8 @@ async function generateCardForUser(
   if (cellData.length < totalCells - 1) {
     cellData.push({
       text: teamResolutionText,
+      resolutionId: null,
+      teamProvidedResolutionId: null,
       sourceType: 'team',
       sourceUserId: null,
       isJoker: false,
@@ -211,6 +258,8 @@ async function generateCardForUser(
       if (!usedTexts.has(res.text.toLowerCase())) {
         cellData.push({
           text: res.text,
+          resolutionId: res.id,
+          teamProvidedResolutionId: null,
           sourceType: 'personal',
           sourceUserId: userId,
           isJoker: false,
@@ -226,6 +275,8 @@ async function generateCardForUser(
   while (cellData.length < totalCells - 1) {
     cellData.push({
       text: 'Empty',
+      resolutionId: null,
+      teamProvidedResolutionId: null,
       sourceType: 'empty',
       sourceUserId: null,
       isJoker: false,
@@ -238,30 +289,31 @@ async function generateCardForUser(
   shuffleArray(cellData);
 
   // Insert cells into database
+  // The Joker cell is implicit (always at center position) and is NOT stored in the database.
+  // Spec (updated): 05-bingo-card-generation.md
+  let dataIndex = 0;
   for (let position = 0; position < totalCells; position++) {
+    if (position === centerPosition) continue;
+
     const cellId = randomUUID();
+    const data = cellData[dataIndex];
+    dataIndex += 1;
 
-    if (position === centerPosition) {
-      // Insert joker at center - informational only, displays "Joker"
-      // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
-      await connection.execute(
-        `INSERT INTO bingo_cells 
-         (id, card_id, position, resolution_text, is_joker, is_empty, source_type, source_user_id, state)
-         VALUES (?, ?, ?, ?, TRUE, FALSE, 'team', NULL, 'pending')`,
-        [cellId, cardId, position, 'Joker']
-      );
-    } else {
-      // Get the cell data for this position (accounting for joker)
-      const dataIndex = position < centerPosition ? position : position - 1;
-      const data = cellData[dataIndex];
-
-      await connection.execute(
-        `INSERT INTO bingo_cells 
-         (id, card_id, position, resolution_text, is_joker, is_empty, source_type, source_user_id, state)
-         VALUES (?, ?, ?, ?, FALSE, ?, ?, ?, 'pending')`,
-        [cellId, cardId, position, data.text, data.isEmpty, data.sourceType, data.sourceUserId]
-      );
-    }
+    await connection.execute(
+      `INSERT INTO bingo_cells 
+       (id, card_id, position, resolution_id, team_provided_resolution_id, is_empty, source_type, source_user_id, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [
+        cellId,
+        cardId,
+        position,
+        data.resolutionId,
+        data.teamProvidedResolutionId,
+        data.isEmpty,
+        data.sourceType,
+        data.sourceUserId,
+      ]
+    );
   }
 
   return {
@@ -307,6 +359,50 @@ export async function getBingoCard(
 }
 
 /**
+ * Ensure a user has a bingo card for a started team.
+ * Spec: 04-bingo-teams.md - Joining After Start
+ */
+export async function ensureBingoCardForUser(
+  teamId: string,
+  userId: string
+): Promise<{ created: boolean; card?: BingoCard; error?: string }> {
+  const existing = await query<CardRow[]>(
+    `SELECT * FROM bingo_cards WHERE team_id = ? AND user_id = ? LIMIT 1`,
+    [teamId, userId]
+  );
+
+  if (existing.length > 0) {
+    return { created: false, card: rowToCard(existing[0]) };
+  }
+
+  const team = await getTeamById(teamId);
+  if (!team) {
+    return { created: false, error: 'Team not found' };
+  }
+
+  if (team.status !== 'started') {
+    return { created: false, error: 'Team is not started' };
+  }
+
+  if (!team.teamResolutionText) {
+    return { created: false, error: 'Team resolution must be set' };
+  }
+
+  const connection = await getConnection();
+  try {
+    await connection.beginTransaction();
+    const card = await generateCardForUser(connection, teamId, userId, team.teamResolutionText);
+    await connection.commit();
+    return { created: true, card };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Get bingo card by ID
  */
 export async function getBingoCardById(cardId: string): Promise<BingoCardWithCells | null> {
@@ -331,7 +427,9 @@ export async function getBingoCardById(cardId: string): Promise<BingoCardWithCel
  */
 async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]> {
   const cellRows = await query<CellRow[]>(
-    `SELECT * FROM bingo_cells WHERE card_id = ? ORDER BY position ASC`,
+    `${SELECT_CELL_WITH_RESOLVED_TEXT}
+     WHERE c.card_id = ?
+     ORDER BY c.position ASC`,
     [cardId]
   );
 
@@ -358,6 +456,32 @@ async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]>
     });
   }
 
+  // Ensure the implicit Joker cell exists in the returned grid.
+  // It is not stored in the DB; we synthesize it for the UI.
+  const centerPosition = 12;
+  const hasCenter = cells.some((c) => c.position === centerPosition);
+  if (!hasCenter) {
+    cells.push({
+      id: `joker:${cardId}`,
+      cardId,
+      position: centerPosition,
+      resolutionId: null,
+      teamProvidedResolutionId: null,
+      resolutionText: 'Joker',
+      isJoker: true,
+      isEmpty: false,
+      sourceType: 'team',
+      sourceUserId: null,
+      state: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      proof: null,
+      reviewThreadId: null,
+    });
+  }
+
+  cells.sort((a, b) => a.position - b.position);
+
   return cells;
 }
 
@@ -371,9 +495,16 @@ export async function updateCellState(
   userId: string,
   newState: CellState
 ): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+  // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md - Joker is implicit and not modifiable.
+  if (cellId.startsWith('joker:')) {
+    return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
   // Get the cell and verify ownership
-  const cellRows = await query<CellRow[]>(
-    `SELECT c.*, bc.user_id as card_user_id
+  const cellRows = await query<Array<
+    { id: string; is_empty: boolean | number; state: CellState; card_user_id: string }
+  >>(
+    `SELECT c.id, c.is_empty, c.state, bc.user_id as card_user_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -387,18 +518,13 @@ export async function updateCellState(
   const cell = cellRows[0];
 
   // Spec: 06-bingo-gameplay.md - Only the card owner can change their card's cell states
-  if ((cell as CellRow & { card_user_id: string }).card_user_id !== userId) {
+  if (cell.card_user_id !== userId) {
     return { success: false, error: 'Only the card owner can update cell state' };
   }
 
   // Spec: 06-bingo-gameplay.md - "empty" filler cells cannot be marked completed
   if (cell.is_empty && (newState === 'completed' || newState === 'accomplished')) {
     return { success: false, error: 'Empty cells cannot be marked as completed' };
-  }
-
-  // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
-  if (cell.is_joker) {
-    return { success: false, error: 'Joker cell cannot be modified' };
   }
 
   // Validate state transitions
@@ -416,14 +542,103 @@ export async function updateCellState(
     [newState, cellId]
   );
 
-  const updatedRows = await query<CellRow[]>(
-    `SELECT * FROM bingo_cells WHERE id = ?`,
+  const updatedRow = await getResolvedCellRowById(cellId);
+  if (!updatedRow) {
+    return { success: false, error: 'Cell not found' };
+  }
+
+  return { success: true, cell: rowToCell(updatedRow) };
+}
+
+export async function updateCellContent(
+  cellId: string,
+  userId: string,
+  update: {
+    resolutionId: string | null;
+    teamProvidedResolutionId: string | null;
+    sourceType: CellSourceType;
+    sourceUserId: string | null;
+    isEmpty: boolean;
+  }
+): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+
+  // Spec: 05-bingo-card-generation.md, 09-bingo-card-editing.md - Joker is implicit and immutable.
+  if (cellId.startsWith('joker:')) {
+    return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
+  if (update.sourceType === 'personal' && !update.resolutionId) {
+    return { success: false, error: 'resolutionId is required for personal cells' };
+  }
+
+  if (update.sourceType === 'member_provided' && !update.teamProvidedResolutionId) {
+    return { success: false, error: 'teamProvidedResolutionId is required for member_provided cells' };
+  }
+
+  // Get the cell (and card owner) for authorization and joker protection
+  const cellRows = await query<Array<{ source_type: CellSourceType; card_user_id: string }>>(
+    `SELECT c.source_type, bc.user_id as card_user_id
+     FROM bingo_cells c
+     JOIN bingo_cards bc ON c.card_id = bc.id
+     WHERE c.id = ?`,
     [cellId]
   );
 
-  return { success: true, cell: rowToCell(updatedRows[0]) };
-}
+  if (cellRows.length === 0) {
+    return { success: false, error: 'Cell not found' };
+  }
 
+  const cell = cellRows[0];
+
+  if (cell.card_user_id !== userId) {
+    return { success: false, error: 'Only the card owner can edit cell content' };
+  }
+
+  // Team resolution cells are immutable (same as Joker for edit-card flow)
+  if (cell.source_type === 'team') {
+    return { success: false, error: 'Team resolution cell cannot be modified' };
+  }
+
+  // Keep empty flag consistent with source type
+  if (update.isEmpty && update.sourceType !== 'empty') {
+    return { success: false, error: 'Empty cells must have sourceType "empty"' };
+  }
+  if (!update.isEmpty && update.sourceType === 'empty') {
+    return { success: false, error: 'Non-empty cells cannot have sourceType "empty"' };
+  }
+
+  // Prevent storing ids for types that shouldn't have them
+  if (update.sourceType === 'team' || update.sourceType === 'empty') {
+    if (update.resolutionId || update.teamProvidedResolutionId) {
+      return { success: false, error: 'Team/empty cells cannot reference a resolution id' };
+    }
+  }
+
+  const sourceUserId = update.sourceUserId ? update.sourceUserId : null;
+
+  const resolutionId = update.sourceType === 'personal' ? update.resolutionId : null;
+  const teamProvidedResolutionId =
+    update.sourceType === 'member_provided' ? update.teamProvidedResolutionId : null;
+
+  await query(
+    `UPDATE bingo_cells
+     SET resolution_id = ?,
+         team_provided_resolution_id = ?,
+         source_type = ?,
+         source_user_id = ?,
+         is_empty = ?,
+         state = 'pending'
+     WHERE id = ?`,
+    [resolutionId, teamProvidedResolutionId, update.sourceType, sourceUserId, update.isEmpty, cellId]
+  );
+
+  const updatedRow = await getResolvedCellRowById(cellId);
+  if (!updatedRow) {
+    return { success: false, error: 'Cell not found' };
+  }
+
+  return { success: true, cell: rowToCell(updatedRow) };
+}
 /**
  * Undo completion - revert cell to pending and close any open thread
  * Spec: Resolution Review & Proof Workflow - Undo Completion
@@ -547,14 +762,10 @@ export async function getTeamBingoCards(
  * Get a specific cell
  */
 export async function getCellById(cellId: string): Promise<BingoCellWithProof | null> {
-  const cellRows = await query<CellRow[]>(
-    `SELECT * FROM bingo_cells WHERE id = ?`,
-    [cellId]
-  );
+  const row = await getResolvedCellRowById(cellId);
+  if (!row) return null;
 
-  if (cellRows.length === 0) return null;
-
-  const cell = rowToCell(cellRows[0]);
+  const cell = rowToCell(row);
 
   const proofRows = await query<ProofRow[]>(
     `SELECT * FROM cell_proofs WHERE cell_id = ? ORDER BY created_at DESC LIMIT 1`,
@@ -613,9 +824,25 @@ export async function reportDuplicate(
 
   // If replacement text provided, update the cell
   if (replacementText && replacementText.trim()) {
+    const trimmed = replacementText.trim();
+
+    const resolutionRows = await query<Array<{ id: string }>>(
+      `SELECT id FROM resolutions WHERE text = ? LIMIT 1`,
+      [trimmed]
+    );
+    const teamProvidedRows = await query<Array<{ id: string }>>(
+      `SELECT id FROM team_provided_resolutions WHERE text = ? LIMIT 1`,
+      [trimmed]
+    );
+
+    const resolutionId = resolutionRows.length > 0 ? resolutionRows[0].id : null;
+    const teamProvidedResolutionId = teamProvidedRows.length > 0 ? teamProvidedRows[0].id : null;
+
     await query(
-      `UPDATE bingo_cells SET resolution_text = ? WHERE id = ?`,
-      [replacementText.trim(), cellId]
+      `UPDATE bingo_cells
+       SET resolution_id = ?, team_provided_resolution_id = ?
+       WHERE id = ?`,
+      [resolutionId, teamProvidedResolutionId, cellId]
     );
 
     await query(

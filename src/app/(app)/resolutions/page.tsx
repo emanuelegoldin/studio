@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Pencil, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
 
@@ -29,6 +29,9 @@ function ResolutionsManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const loadResolutions = useCallback(async () => {
     try {
@@ -67,7 +70,7 @@ function ResolutionsManager() {
       const data = await response.json();
 
       if (response.ok) {
-        setResolutions([data.resolution, ...resolutions]);
+        setResolutions((prev) => [data.resolution, ...prev]);
         setNewResolution("");
         toast({
           title: "Success",
@@ -99,7 +102,7 @@ function ResolutionsManager() {
       });
 
       if (response.ok) {
-        setResolutions(resolutions.filter(res => res.id !== id));
+        setResolutions((prev) => prev.filter(res => res.id !== id));
         toast({
           title: "Success",
           description: "Resolution deleted",
@@ -120,6 +123,56 @@ function ResolutionsManager() {
       });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleStartEdit = (resolution: Resolution) => {
+    setEditingId(resolution.id);
+    setEditingText(resolution.text);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingText("");
+  };
+
+  const handleSaveEdit = async (id: string) => {
+    const text = editingText.trim();
+    if (!text) return;
+
+    setSavingId(id);
+    try {
+      const response = await fetch('/api/resolutions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, text }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setResolutions((prev) => prev.map(res => (res.id === id ? data.resolution : res)));
+        setEditingId(null);
+        setEditingText("");
+        toast({
+          title: "Success",
+          description: "Resolution updated",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to update resolution",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -160,20 +213,70 @@ function ResolutionsManager() {
         <ul className="space-y-2">
           {resolutions.map(res => (
             <li key={res.id} className="flex items-center justify-between p-2 rounded-md bg-secondary/50">
-              <span className="text-sm">{res.text}</span>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-destructive" 
-                onClick={() => handleDeleteResolution(res.id)}
-                disabled={deletingId === res.id}
-              >
-                {deletingId === res.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+              {editingId === res.id ? (
+                <Input
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  className="h-8 text-sm"
+                  disabled={savingId === res.id}
+                />
+              ) : (
+                <span className="text-sm">{res.text}</span>
+              )}
+
+              <div className="flex items-center gap-1">
+                {editingId === res.id ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-green-600"
+                      onClick={() => handleSaveEdit(res.id)}
+                      disabled={savingId === res.id || !editingText.trim()}
+                    >
+                      {savingId === res.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                      onClick={handleCancelEdit}
+                      disabled={savingId === res.id}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
                 ) : (
-                  <Trash2 className="h-4 w-4" />
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => handleStartEdit(res)}
+                      disabled={deletingId === res.id}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteResolution(res.id)}
+                      disabled={deletingId === res.id}
+                    >
+                      {deletingId === res.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </>
                 )}
-              </Button>
+              </div>
             </li>
           ))}
           {resolutions.length === 0 && (
