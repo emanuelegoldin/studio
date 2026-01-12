@@ -227,7 +227,6 @@ export async function getPendingProofsForTeam(
       bc.user_id as card_user_id,
       CASE
         WHEN c.is_empty THEN 'Empty'
-        WHEN c.is_joker THEN 'Joker'
         WHEN c.source_type = 'team' THEN COALESCE(t.team_resolution_text, 'Team Goal')
         WHEN c.team_provided_resolution_id IS NOT NULL THEN tpr.text
         WHEN c.resolution_id IS NOT NULL THEN r.text

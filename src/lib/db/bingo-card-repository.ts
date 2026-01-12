@@ -35,7 +35,6 @@ interface CellRow {
   team_provided_resolution_id: string | null;
   // Derived display text (resolved from joins)
   resolution_text: string;
-  is_joker: boolean | number;
   is_empty: boolean | number;
   source_type: CellSourceType;
   source_user_id: string | null;
@@ -73,7 +72,8 @@ function rowToCell(row: CellRow): BingoCell {
     resolutionId: row.resolution_id,
     teamProvidedResolutionId: row.team_provided_resolution_id,
     resolutionText: row.resolution_text,
-    isJoker: Boolean(row.is_joker),
+    // Spec: 05-bingo-card-generation.md - Joker is implicit and not stored in the DB.
+    isJoker: false,
     isEmpty: Boolean(row.is_empty),
     sourceType: row.source_type,
     sourceUserId: row.source_user_id,
@@ -92,13 +92,11 @@ const SELECT_CELL_WITH_RESOLVED_TEXT = `
     c.team_provided_resolution_id,
     CASE
       WHEN c.is_empty THEN 'Empty'
-      WHEN c.is_joker THEN 'Joker'
       WHEN c.source_type = 'team' THEN COALESCE(t.team_resolution_text, 'Team Goal')
       WHEN c.team_provided_resolution_id IS NOT NULL THEN tpr.text
       WHEN c.resolution_id IS NOT NULL THEN r.text
       ELSE ''
     END AS resolution_text,
-    c.is_joker,
     c.is_empty,
     c.source_type,
     c.source_user_id,
@@ -303,8 +301,8 @@ async function generateCardForUser(
 
     await connection.execute(
       `INSERT INTO bingo_cells 
-       (id, card_id, position, resolution_id, team_provided_resolution_id, is_joker, is_empty, source_type, source_user_id, state)
-       VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, ?, 'pending')`,
+       (id, card_id, position, resolution_id, team_provided_resolution_id, is_empty, source_type, source_user_id, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         cellId,
         cardId,
@@ -497,11 +495,16 @@ export async function updateCellState(
   userId: string,
   newState: CellState
 ): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+  // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md - Joker is implicit and not modifiable.
+  if (cellId.startsWith('joker:')) {
+    return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
   // Get the cell and verify ownership
   const cellRows = await query<Array<
-    Pick<CellRow, 'id' | 'is_empty' | 'is_joker' | 'state'> & { card_user_id: string }
+    { id: string; is_empty: boolean | number; state: CellState; card_user_id: string }
   >>(
-    `SELECT c.id, c.is_empty, c.is_joker, c.state, bc.user_id as card_user_id
+    `SELECT c.id, c.is_empty, c.state, bc.user_id as card_user_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -522,11 +525,6 @@ export async function updateCellState(
   // Spec: 06-bingo-gameplay.md - "empty" filler cells cannot be marked completed
   if (cell.is_empty && (newState === 'completed' || newState === 'accomplished')) {
     return { success: false, error: 'Empty cells cannot be marked as completed' };
-  }
-
-  // Spec: 06-bingo-gameplay.md - Joker cell is informational and not checkable
-  if (cell.is_joker) {
-    return { success: false, error: 'Joker cell cannot be modified' };
   }
 
   // Validate state transitions
@@ -564,6 +562,11 @@ export async function updateCellContent(
   }
 ): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
 
+  // Spec: 05-bingo-card-generation.md, 09-bingo-card-editing.md - Joker is implicit and immutable.
+  if (cellId.startsWith('joker:')) {
+    return { success: false, error: 'Joker cell cannot be modified' };
+  }
+
   if (update.sourceType === 'personal' && !update.resolutionId) {
     return { success: false, error: 'resolutionId is required for personal cells' };
   }
@@ -573,8 +576,8 @@ export async function updateCellContent(
   }
 
   // Get the cell (and card owner) for authorization and joker protection
-  const cellRows = await query<(CellRow & { card_user_id: string })[]>(
-    `SELECT c.*, bc.user_id as card_user_id
+  const cellRows = await query<Array<{ source_type: CellSourceType; card_user_id: string }>>(
+    `SELECT c.source_type, bc.user_id as card_user_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -589,11 +592,6 @@ export async function updateCellContent(
 
   if (cell.card_user_id !== userId) {
     return { success: false, error: 'Only the card owner can edit cell content' };
-  }
-
-  // Spec: 05-bingo-card-generation.md, 09-bingo-card-editing.md - Joker cell is immutable
-  if (cell.is_joker) {
-    return { success: false, error: 'Joker cell cannot be modified' };
   }
 
   // Team resolution cells are immutable (same as Joker for edit-card flow)
