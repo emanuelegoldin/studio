@@ -8,6 +8,16 @@ docker-compose up --build -d mariadb  # Starts MariaDB
 npm run dev
 ```
 
+## Deployment note
+
+The default [docker-compose.yml](docker-compose.yml) is intended for local development and uses `build:`.
+For a server deployment (pulling published images), use [docker-compose.prod.yml](docker-compose.prod.yml) and run:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+```
+
 ## Issues Labels
 
 - **question**: an issue not ready to be assigned. More information is needed and the issue itself has to be formalized (i.e., provide structured information, definition of "done", specifications, etc.)
