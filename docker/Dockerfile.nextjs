@@ -2,6 +2,7 @@
 FROM node:lts-slim AS build
 WORKDIR /app
 
+RUN mkdir uploads
 RUN corepack enable pnpm
 
 COPY package.json ./

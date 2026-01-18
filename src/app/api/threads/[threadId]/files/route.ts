@@ -115,14 +115,14 @@ export async function POST(
 
     // Save file to disk
     const bytes = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'review-files');
+    const uploadDir = path.join(process.cwd(), 'uploads', 'review-files');
     await mkdir(uploadDir, { recursive: true });
 
     const filename = `${randomUUID()}.${ext}`;
     const filePath = path.join(uploadDir, filename);
     await writeFile(filePath, bytes);
 
-    const fileUrl = `/uploads/review-files/${filename}`;
+    const fileUrl = `/review-files/${filename}`;
 
     // Save to database
     const result = await uploadFile(
