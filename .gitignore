@@ -51,8 +51,5 @@ firebase-debug.log
 firestore-debug.log
 
 # uploads
-/public/uploads/review-files/*
-!/public/uploads/review-files/.gitkeep
-
-# nginx config
-nyr-bingo.conf
+uploads/review-files/*
+!uploads/review-files/.gitkeep
