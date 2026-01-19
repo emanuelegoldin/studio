@@ -7,7 +7,7 @@ export interface Resolution {
   isCompleted: boolean;
   proposer?: string;
   proof?: string;
-  status: 'tocomplete' | 'pending' | 'completed' | 'rejected';
+  status: 'tocomplete' | 'pending' | 'completed' | 'rejected';  // TODO: check if we need this
 }
 
 export interface User {

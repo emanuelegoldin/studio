@@ -73,7 +73,10 @@ export interface Resolution {
 
 // Team status
 // Spec: 04-bingo-teams.md
-export type TeamStatus = 'forming' | 'started';
+export enum TeamStatus {
+  FORMING = 'forming',
+  STARTED = 'started'
+}
 
 // Team entity
 // Spec: 04-bingo-teams.md
@@ -89,7 +92,10 @@ export interface Team {
 
 // Team membership role
 // Spec: 04-bingo-teams.md
-export type TeamRole = 'leader' | 'member';
+export enum TeamRole{
+  LEADER = 'leader',
+  MEMBER = 'member'
+}
 
 // Team membership
 // Spec: 04-bingo-teams.md
@@ -103,7 +109,12 @@ export interface TeamMembership {
 
 // Team invitation status
 // Spec: 04-bingo-teams.md
-export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+export enum InvitationStatus {
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  DECLINED = 'declined',
+  EXPIRED = 'expired'
+}
 
 // Team invitation
 // Spec: 04-bingo-teams.md
@@ -142,11 +153,21 @@ export interface BingoCard {
 
 // Cell source type
 // Spec: 05-bingo-card-generation.md
-export type CellSourceType = 'team' | 'member_provided' | 'personal' | 'empty';
+export enum CellSourceType {
+  TEAM = 'team',
+  MEMBER_PROVIDED = 'member_provided',
+  PERSONAL = 'personal',
+  EMPTY = 'empty'
+}
 
 // Cell state
 // Spec: 06-bingo-gameplay.md, Resolution Review & Proof Workflow
-export type CellState = 'pending' | 'completed' | 'pending_review' | 'accomplished';
+export enum CellState {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  PENDING_REVIEW = 'pending_review',
+  ACCOMPLISHED = 'accomplished'
+}
 
 // Bingo cell
 // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md
@@ -168,7 +189,11 @@ export interface BingoCell {
 
 // Proof status
 // Spec: 07-proof-and-approval.md, AGENTS.md
-export type ProofStatus = 'pending' | 'approved' | 'declined';
+export enum ProofStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  DECLINED = 'declined'
+}
 
 // Cell proof
 // Spec: 07-proof-and-approval.md
@@ -184,7 +209,10 @@ export interface CellProof {
 
 // Proof review decision
 // Spec: 07-proof-and-approval.md
-export type ReviewDecision = 'approved' | 'declined';
+export enum ReviewDecision {
+  APPROVED = 'approved',
+  DECLINED = 'declined'
+}
 
 // Proof review
 // Spec: 07-proof-and-approval.md
@@ -199,7 +227,10 @@ export interface ProofReview {
 
 // Duplicate report status
 // Spec: 05-bingo-card-generation.md
-export type DuplicateReportStatus = 'pending' | 'resolved';
+export enum DuplicateReportStatus {
+  PENDING = 'pending',
+  RESOLVED = 'resolved'
+}
 
 // Duplicate report
 // Spec: 05-bingo-card-generation.md
@@ -236,7 +267,10 @@ export interface BingoCellWithProof extends BingoCell {
 // Review thread types
 // Spec: Resolution Review & Proof Workflow
 
-export type ThreadStatus = 'open' | 'closed';
+export enum ThreadStatus {
+  OPEN = 'open', 
+  CLOSED = 'closed'
+}
 
 export interface ReviewThread {
   id: string;
@@ -266,7 +300,10 @@ export interface ReviewFile {
   createdAt: Date;
 }
 
-export type VoteType = 'accept' | 'deny';
+export enum VoteType {
+  ACCEPT = 'accept',
+  DENY = 'deny'
+}
 
 export interface ReviewVote {
   id: string;

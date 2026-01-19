@@ -12,6 +12,8 @@ import type {
   TeamWithMembers,
   TeamMemberWithProfile,
   TeamStatus,
+  TeamRole,
+  InvitationStatus,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { getPublicUserProfile } from './user-repository';
@@ -32,7 +34,7 @@ interface MembershipRow extends RowDataPacket {
   id: string;
   team_id: string;
   user_id: string;
-  role: 'leader' | 'member';
+  role: TeamRole;
   joined_at: Date;
 }
 
@@ -42,7 +44,7 @@ interface InvitationRow extends RowDataPacket {
   invite_code: string;
   invited_email: string | null;
   invited_user_id: string | null;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  status: InvitationStatus;
   expires_at: Date;
   created_at: Date;
 }
