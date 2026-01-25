@@ -10,14 +10,13 @@ import type {
   ReviewFile,
   ReviewVote,
   ReviewThreadWithDetails,
-  ThreadStatus,
-  VoteType,
 } from './types';
 import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { PoolConnection } from 'mysql2/promise';
+import { ThreadStatus, VoteType } from '../shared/types';
 
 // Row types from database
 interface ThreadRow {
@@ -32,7 +31,7 @@ interface ThreadRow {
 interface MessageAndUsernameRow {
   id: string;
   content: string;
-  authorUsername: string;
+  username: string;
 }
 
 interface FileRow {
@@ -79,7 +78,7 @@ function rowToThread(row: ThreadRow): ReviewThread {
 function rowToMessage(row: MessageAndUsernameRow): ReviewMessageAndAuthor {
   return {
     id: row.id,
-    authorUsername: row.authorUsername,
+    authorUsername: row.username,
     content: row.content
   };
 }
