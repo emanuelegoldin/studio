@@ -15,6 +15,7 @@ import { RequestProofDialog } from "./dialogs/request-proof";
 import { EditCellDialog } from "./dialogs/edit-cell";
 import { CellThreadDialog } from "./dialogs/thread-dialog";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
+import { useToast } from "@/hooks/use-toast";
 
 interface BingoCell {
   id: string;
@@ -54,31 +55,21 @@ const stateConfig = {
   declined: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
 };
 
-type EditOption = {
-  key: string;
-  label: string;
-  resolutionText: string;
-  resolutionId: string | null;
-  teamProvidedResolutionId: string | null;
-  sourceType: 'team' | 'member_provided' | 'personal' | 'empty';
-  sourceUserId: string | null;
-  isEmpty: boolean;
-};
-
 function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, allCells, onUpdate, onRefresh }: BingoSquareProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | null>(null);
   const [usernames, setUsernames] = useState<Record<string, string>>({});
-  
+  const { toast } = useToast();
+
   // Determine visual state based on cell state and proof status
   let visualState: keyof typeof stateConfig = cell.state;
   if (cell.proof) {
     if (cell.proof.status === 'pending') visualState = 'pending_review';
     else if (cell.proof.status === 'declined') visualState = 'declined';
   }
-  
+
   const config = stateConfig[visualState] || stateConfig.pending;
-  
+
   // Spec: 06-bingo-gameplay.md
   // - Empty filler cells are not checkable
   // - Joker cell is informational only
@@ -131,21 +122,24 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
 
   useEffect(() => {
     // Fetch username for the cell's source user (client-safe via API)
-    const fetchCellUser = async () => {
-      const id = cell.sourceUserId;
-      if (!id) return;
-      if (usernames[id]) return;
-      try {
-        const res = await fetch(`/api/users/${id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data?.username) setUsernames(prev => ({ ...prev, [id]: data.username }));
-      } catch {
-        // ignore
+    const fetchUsernames = async () => {
+      const teamMemberUsernamesRes = await fetch(`/api/teams/${teamId}/members`);
+
+      const teamMemberUsernamesData: { members?: Record<string, string>; error?: string } =
+        await teamMemberUsernamesRes.json().catch(() => ({}));
+
+      if (!teamMemberUsernamesRes.ok) {
+        toast({
+          title: 'Error',
+          description: teamMemberUsernamesData?.error || 'Failed to load team member usernames',
+          variant: 'destructive',
+        });
+        return;
       }
+      setUsernames(teamMemberUsernamesData.members ?? {});
     };
 
-    fetchCellUser();
+    fetchUsernames();
 
     if (!isModalOpen) {
       setModalMode(null);
@@ -181,15 +175,15 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
         )}
       </button>
 
-      {modalMode === "complete" && 
-        <MarkCellCompleteDialog 
+      {modalMode === "complete" &&
+        <MarkCellCompleteDialog
           cell={{
             id: cell.id,
             resolutionText: cell.resolutionText
           }}
           open={isModalOpen}
           setIsOpen={setIsModalOpen}
-          onUpdate={onUpdate}/>
+          onUpdate={onUpdate} />
       }
       {modalMode === "request_proof" &&
         <RequestProofDialog
@@ -199,29 +193,29 @@ function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, a
           }}
           isOpen={isModalOpen}
           setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh}/>
+          onRefresh={onRefresh} />
       }
       {modalMode === "edit_cell" && isOwner &&
         <EditCellDialog
           cellId={cell.id}
-          existingCells={allCells? allCells : []}
-          teamId={teamId? teamId : ""}
-          currentUserId={currentUserId? currentUserId : ""}
+          existingCells={allCells ? allCells : []}
+          teamId={teamId ? teamId : ""}
+          currentUserId={currentUserId ? currentUserId : ""}
           isOpen={isModalOpen}
           setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh}/>
+          onRefresh={onRefresh} />
       }
-      {modalMode === "thread" && 
+      {modalMode === "thread" &&
         <CellThreadDialog
           cell={{
             id: cell.id,
             resolutionText: cell.resolutionText,
-            reviewThreadId: cell.reviewThreadId? cell.reviewThreadId : ""
+            reviewThreadId: cell.reviewThreadId ? cell.reviewThreadId : ""
           }}
           isOwner={isOwner}
           isOpen={isModalOpen}
           setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh}/>
+          onRefresh={onRefresh} />
       }
     </>
   );
@@ -265,9 +259,9 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
 
       <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
         {sortedCells.map((cell) => (
-          <BingoSquare 
-            key={cell.id} 
-            cell={cell} 
+          <BingoSquare
+            key={cell.id}
+            cell={cell}
             isOwner={isOwner}
             editMode={editMode}
             teamId={teamId}
