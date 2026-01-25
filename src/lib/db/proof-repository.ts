@@ -4,9 +4,10 @@
  */
 
 import { query, getConnection } from './connection';
-import type { CellProof, ProofReview, ProofStatus, ReviewDecision } from './types';
+import type { CellProof, ProofReview } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { isTeamMember } from './team-repository';
+import { ProofStatus, ReviewDecision } from '../shared/types';
 
 // Row types from database
 interface ProofRow {

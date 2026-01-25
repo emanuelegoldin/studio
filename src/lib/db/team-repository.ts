@@ -11,13 +11,11 @@ import type {
   TeamProvidedResolution,
   TeamWithMembers,
   TeamMemberWithProfile,
-  TeamStatus,
-  TeamRole,
-  InvitationStatus,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { getPublicUserProfile } from './user-repository';
 import type { RowDataPacket } from 'mysql2/promise';
+import { TeamStatus, TeamRole, InvitationStatus } from '../shared/types';
 
 // Row types from database (snake_case)
 interface TeamRow extends RowDataPacket {

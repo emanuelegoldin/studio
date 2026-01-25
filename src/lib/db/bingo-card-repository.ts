@@ -10,14 +10,12 @@ import {
   BingoCellWithProof,
   BingoCardWithCells,
   CellProof,
-  CellState,
-  CellSourceType,
-  ProofStatus,
 } from './types';
 import { randomUUID } from 'crypto';
 import { getTeamById, getTeamMembers, isTeamMember } from './team-repository';
 import { getTeamProvidedResolutionsForUser } from './team-repository';
 import { getRandomResolutions } from './resolution-repository';
+import { CellSourceType, CellState, ProofStatus } from '../shared/types';
 
 // Row types from database
 interface CardRow {
