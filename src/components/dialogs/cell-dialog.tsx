@@ -1,0 +1,30 @@
+import { PropsWithChildren, ReactNode } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
+import { Button } from "../ui/button"
+
+interface CellDialogProps {
+    title?: string,
+    description?: string,
+    isOpen: boolean,
+    setIsOpen: (isOpen: boolean) => void
+}
+
+export const CellDialog = ({
+    title,
+    description,
+    isOpen,
+    setIsOpen,
+    children
+} : PropsWithChildren<CellDialogProps>) => {
+    return(
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogContent>
+            <DialogHeader>
+                {title && <DialogTitle className="font-headline">{title}</DialogTitle>}
+                {description && <DialogDescription>{description}</DialogDescription>}
+            </DialogHeader>
+          {children}
+          </DialogContent>
+        </Dialog>
+    )
+}
