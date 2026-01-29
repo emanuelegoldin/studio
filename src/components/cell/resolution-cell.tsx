@@ -43,7 +43,7 @@ export const ResoultionCell = ({
             setModalMode('edit_cell');
             setIsModalOpen(true);
             return;
-        }
+        }  
         if (isOwner) {
             if (cell.state === CellState.PENDING) {
                 setModalMode('complete');
@@ -55,9 +55,11 @@ export const ResoultionCell = ({
                 setIsModalOpen(true);
                 return;
             }
-            // completed/accomplished
-            onUpdate?.(cell.id, CellState.PENDING);
-            return;
+            // isOwner && completed --> set pending
+            if (cell.state === CellState.COMPLETED){
+                onUpdate?.(cell.id, CellState.PENDING);
+                return;
+            }
         }
         // Viewing someone else's card
         if (cell.state === CellState.COMPLETED) {
@@ -109,10 +111,13 @@ export const ResoultionCell = ({
 
     const config = stateConfig[visualState] || stateConfig.pending;
     // Spec: 09-bingo-card-editing.md - In edit mode, any non-joker, non-team cell is selectable (including empty)
-    const canEditContent = Boolean(editMode && isOwner && !cell.isJoker && cell.sourceType !== 'team');
+    const canEditContent = Boolean(editMode && isOwner && cell.sourceType !== 'team');
     const canInteract =
-        canEditContent ||
-        (!editMode && !cell.isEmpty && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'));
+        cell.state !== CellState.ACCOMPLISHED &&    // Accomplished cells have no interactions
+        (
+            canEditContent ||
+            (!editMode && !cell.isEmpty && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'))
+        );
     return (
         <>
             {cell.isEmpty ?
@@ -134,7 +139,7 @@ export const ResoultionCell = ({
                         {cell.resolutionText}
                     </p>
                     <div className="absolute top-1 right-1">
-                        {visualState !== 'pending' && !cell.isJoker && config.icon}
+                        {visualState !== 'pending' && config.icon}
                     </div>
                     <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
                         {cell.sourceType === CellSourceType.TEAM && "Team Goal"}
