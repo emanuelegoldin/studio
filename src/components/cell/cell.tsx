@@ -1,38 +1,25 @@
 import { CellState, ProofStatus } from "@/lib/shared/types";
-import { useState } from "react"
+import { PropsWithChildren, useState } from "react"
 
-interface BingoCell {
-  id: string;
-  cardId: string;
-  position: number;
-  resolutionId?: string | null;
-  teamProvidedResolutionId?: string | null;
-  resolutionText: string;
-  isJoker: boolean;
-  isEmpty: boolean;
-  sourceType: string;
-  sourceUserId: string | null;
-  state: CellState;
-  reviewThreadId?: string | null;
-  proof: {
-    id: string;
-    status: ProofStatus;
-  } | null;
-}
-
-interface CellProps{
-    isEditable: boolean
-    isOwner: boolean
+export interface CellProps {
+    cellClassName: string,
+    isDisabled: boolean,
+    onClick: () => void
 }
 
 export const Cell = ({
-    isEditable,
-    isOwner
-}: CellProps) => {
-    const [showDialog, setShowDialog] = useState<boolean>(false);
-
+    cellClassName,
+    isDisabled,
+    children,
+    onClick
+}: PropsWithChildren<CellProps>) => {
     return (
-        <button>
+        <button
+            onClick={onClick}
+            disabled={isDisabled}
+            className={cellClassName}
+        >
+        {children}
         </button>
     )
 }

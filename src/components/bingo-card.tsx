@@ -6,23 +6,15 @@
  */
 
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import { Star, Check, Hourglass, ThumbsUp, X, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import { MarkCellCompleteDialog } from "./dialogs/complete-dialog";
-import { RequestProofDialog } from "./dialogs/request-proof";
-import { EditCellDialog } from "./dialogs/edit-cell";
-import { CellThreadDialog } from "./dialogs/thread-dialog";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
-import { useToast } from "@/hooks/use-toast";
+import { JokerCell } from "./cell/joker";
+import { ResoultionCell } from "./cell/resolution-cell";
 
 interface BingoCell {
   id: string;
   cardId: string;
   position: number;
-  resolutionId?: string | null;
-  teamProvidedResolutionId?: string | null;
   resolutionText: string;
   isJoker: boolean;
   isEmpty: boolean;
@@ -34,191 +26,6 @@ interface BingoCell {
     id: string;
     status: ProofStatus;
   } | null;
-}
-
-interface BingoSquareProps {
-  cell: BingoCell;
-  isOwner: boolean;
-  editMode?: boolean;
-  teamId?: string;
-  currentUserId?: string;
-  allCells?: BingoCell[];
-  onUpdate?: (cellId: string, newState: 'pending' | 'completed') => void;
-  onRefresh?: () => void;
-}
-
-const stateConfig = {
-  pending: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
-  completed: { icon: <Check className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300" },
-  pending_review: { icon: <Hourglass className="h-4 w-4 text-amber-500" />, color: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-800 dark:text-amber-300" },
-  accomplished: { icon: <ThumbsUp className="h-4 w-4 text-green-500" />, color: "bg-green-100 dark:bg-green-900/50", text: "text-green-800 dark:text-green-300 line-through" },
-  declined: { icon: <X className="h-4 w-4 text-red-500" />, color: "bg-red-100 dark:bg-red-900/50", text: "text-red-800 dark:text-red-300" },
-};
-
-function BingoSquare({ cell, isOwner, editMode = false, teamId, currentUserId, allCells, onUpdate, onRefresh }: BingoSquareProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | null>(null);
-  const [usernames, setUsernames] = useState<Record<string, string>>({});
-  const { toast } = useToast();
-
-  // Determine visual state based on cell state and proof status
-  let visualState: keyof typeof stateConfig = cell.state;
-  if (cell.proof) {
-    if (cell.proof.status === 'pending') visualState = 'pending_review';
-    else if (cell.proof.status === 'declined') visualState = 'declined';
-  }
-
-  const config = stateConfig[visualState] || stateConfig.pending;
-
-  // Spec: 06-bingo-gameplay.md
-  // - Empty filler cells are not checkable
-  // - Joker cell is informational only
-  const isCheckable = !cell.isJoker && !cell.isEmpty;
-  // Spec: 09-bingo-card-editing.md - In edit mode, any non-joker, non-team cell is selectable (including empty)
-  const canEditContent = Boolean(editMode && isOwner && !cell.isJoker && cell.sourceType !== 'team');
-  const canInteract =
-    canEditContent ||
-    (!editMode && isCheckable && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'));
-
-  const handleClick = () => {
-    if (!canInteract) return;
-
-    if (canEditContent) {
-      setModalMode('edit_cell');
-      setIsModalOpen(true);
-      return;
-    }
-
-    if (isOwner) {
-      if (cell.state === 'pending') {
-        setModalMode('complete');
-        setIsModalOpen(true);
-        return;
-      }
-
-      if (cell.state === 'pending_review') {
-        setModalMode('thread');
-        setIsModalOpen(true);
-        return;
-      }
-
-      // completed/accomplished
-      onUpdate?.(cell.id, 'pending');
-      return;
-    }
-
-    // Viewing someone else's card
-    if (cell.state === 'completed') {
-      setModalMode('request_proof');
-      setIsModalOpen(true);
-      return;
-    }
-
-    if (cell.state === 'pending_review') {
-      setModalMode('thread');
-      setIsModalOpen(true);
-    }
-  };
-
-  useEffect(() => {
-    // Fetch username for the cell's source user (client-safe via API)
-    const fetchUsernames = async () => {
-      const teamMemberUsernamesRes = await fetch(`/api/teams/${teamId}/members`);
-
-      const teamMemberUsernamesData: { members?: Record<string, string>; error?: string } =
-        await teamMemberUsernamesRes.json().catch(() => ({}));
-
-      if (!teamMemberUsernamesRes.ok) {
-        toast({
-          title: 'Error',
-          description: teamMemberUsernamesData?.error || 'Failed to load team member usernames',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setUsernames(teamMemberUsernamesData.members ?? {});
-    };
-
-    fetchUsernames();
-
-    if (!isModalOpen) {
-      setModalMode(null);
-    }
-  }, [isModalOpen]);
-
-  return (
-    <>
-      <button
-        onClick={handleClick}
-        disabled={!canInteract}
-        className={cn(
-          "relative flex flex-col items-center justify-center aspect-square p-2 rounded-lg border shadow-sm text-center transition-all duration-300",
-          config.color,
-          cell.isJoker ? "bg-primary text-primary-foreground cursor-default" : "",
-          cell.isEmpty ? "bg-muted cursor-not-allowed" : "",
-          canInteract ? "cursor-pointer hover:scale-105 hover:shadow-md" : "cursor-default"
-        )}
-      >
-        {cell.isJoker && <Star className="h-8 w-8 mb-1" />}
-        <p className={cn("text-xs md:text-sm font-medium", config.text, cell.isJoker && "text-primary-foreground")}>
-          {cell.resolutionText}
-        </p>
-        <div className="absolute top-1 right-1">
-          {visualState !== 'pending' && !cell.isJoker && config.icon}
-        </div>
-        {!cell.isJoker && !cell.isEmpty && (
-          <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
-            {cell.sourceType === CellSourceType.TEAM && "Team Goal"}
-            {cell.sourceType === CellSourceType.MEMBER_PROVIDED && (cell.sourceUserId ? (usernames[cell.sourceUserId] ?? "Team member") : "Team member")}
-            {cell.sourceType === CellSourceType.PERSONAL && "Personal"}
-          </Badge>
-        )}
-      </button>
-
-      {modalMode === "complete" &&
-        <MarkCellCompleteDialog
-          cell={{
-            id: cell.id,
-            resolutionText: cell.resolutionText
-          }}
-          open={isModalOpen}
-          setIsOpen={setIsModalOpen}
-          onUpdate={onUpdate} />
-      }
-      {modalMode === "request_proof" &&
-        <RequestProofDialog
-          cell={{
-            id: cell.id,
-            resolutionText: cell.resolutionText
-          }}
-          isOpen={isModalOpen}
-          setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh} />
-      }
-      {modalMode === "edit_cell" && isOwner &&
-        <EditCellDialog
-          cellId={cell.id}
-          existingCells={allCells ? allCells : []}
-          teamId={teamId ? teamId : ""}
-          currentUserId={currentUserId ? currentUserId : ""}
-          isOpen={isModalOpen}
-          setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh} />
-      }
-      {modalMode === "thread" &&
-        <CellThreadDialog
-          cell={{
-            id: cell.id,
-            resolutionText: cell.resolutionText,
-            reviewThreadId: cell.reviewThreadId ? cell.reviewThreadId : ""
-          }}
-          isOwner={isOwner}
-          isOpen={isModalOpen}
-          setIsOpen={setIsModalOpen}
-          onRefresh={onRefresh} />
-      }
-    </>
-  );
 }
 
 interface BingoCardProps {
@@ -259,17 +66,19 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
 
       <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
         {sortedCells.map((cell) => (
-          <BingoSquare
-            key={cell.id}
-            cell={cell}
-            isOwner={isOwner}
-            editMode={editMode}
-            teamId={teamId}
-            currentUserId={currentUserId}
-            allCells={sortedCells}
-            onUpdate={onCellUpdate}
-            onRefresh={onRefresh}
-          />
+          cell.isJoker ?
+          <JokerCell/>
+          :
+          <ResoultionCell
+              key={cell.id}
+              cell={cell}
+              isOwner={isOwner}
+              editMode={editMode}
+              teamId={teamId ? teamId : ""}
+              currentUserId={currentUserId ? currentUserId : ""}
+              existingCells={sortedCells}
+              onUpdate={onCellUpdate}
+              onRefresh={onRefresh}/>
         ))}
       </div>
     </div>
