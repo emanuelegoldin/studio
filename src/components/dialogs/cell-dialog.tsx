@@ -1,6 +1,5 @@
-import { PropsWithChildren, ReactNode } from "react"
+import { PropsWithChildren } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
-import { Button } from "../ui/button"
 
 interface CellDialogProps {
     title?: string,
