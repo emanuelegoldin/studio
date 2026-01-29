@@ -136,6 +136,7 @@ export default function DashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
+  // TODO: consider moving the cell update logic at Card or Cell level
   const handleCellUpdate = async (teamId: string, cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response =

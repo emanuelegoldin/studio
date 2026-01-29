@@ -383,7 +383,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
       setIsDeleting(false);
     }
   };
-
+ // TODO: consider moving the cell update logic at Card or Cell level
   const handleCellUpdate = async (cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response =
