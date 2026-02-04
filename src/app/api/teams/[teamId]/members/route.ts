@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { getTeamWithMembers } from "@/lib/db";
+import { getTeamWithMembers, isTeamMember } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -20,6 +20,15 @@ export async function GET(
     }
     
     const { teamId } = await params;
+    
+    const isMember = await isTeamMember(teamId, currentUser.id);
+    if (!isMember) {
+      return NextResponse.json(
+        { error: 'You are not a member of this team' },
+        { status: 403 }
+      );
+    }
+    
     // Get full team data with members for each team
     const teamWithMembers = await getTeamWithMembers(teamId);
     const members: Record<string, string> = Object.fromEntries(
@@ -29,7 +38,7 @@ export async function GET(
       members
     });
   } catch (error) {
-    console.error('Get teams error:', error);
+    console.error('Get team members error:', error);
     return NextResponse.json(
       { error: 'An error occurred' },
       { status: 500 }
