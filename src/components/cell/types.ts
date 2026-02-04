@@ -1,4 +1,4 @@
-import { CellState, ProofStatus } from "@/lib/shared/types";
+import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
 
 export interface BingoCell {
     id: string;
@@ -7,7 +7,7 @@ export interface BingoCell {
     resolutionText: string;
     isJoker: boolean;
     isEmpty: boolean;
-    sourceType: string;
+    sourceType: CellSourceType;
     sourceUserId: string | null;
     state: CellState;
     reviewThreadId?: string | null;

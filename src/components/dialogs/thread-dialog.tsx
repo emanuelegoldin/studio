@@ -6,7 +6,7 @@ import { CellDialog } from "./cell-dialog"
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-interface CellThreadDialogPops {
+interface CellThreadDialogProps {
     cell: {
         id: string, 
         resolutionText: string,
@@ -24,7 +24,7 @@ export const CellThreadDialog = ({
     isOpen,
     setIsOpen,
     onRefresh
-}: CellThreadDialogPops) => {
+}: CellThreadDialogProps) => {
   // TODO: Check whether not cleaning up state is an issue (we do not call setIsOpen(false) here)
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [messageDraft, setMessageDraft] = useState('');
@@ -301,5 +301,5 @@ export const CellThreadDialog = ({
               )}
             </div>
         </CellDialog>
-    )
+    );
 }

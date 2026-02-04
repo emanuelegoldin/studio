@@ -16,7 +16,7 @@ interface BingoCell {
       resolutionText: string;
       isJoker: boolean;
       isEmpty: boolean;
-      sourceType: string;
+      sourceType: CellSourceType;
       sourceUserId: string | null;
       state: CellState;
       reviewThreadId?: string | null;
@@ -106,7 +106,7 @@ export const EditCellDialog = ({
               resolutionText: r.text,
               resolutionId: typeof r.id === 'string' ? r.id : null,
               teamProvidedResolutionId: null,
-              sourceType: 'personal',
+              sourceType: CellSourceType.PERSONAL,
               sourceUserId: currentUserId ?? null,
               isEmpty: false,
             }))
@@ -133,7 +133,7 @@ export const EditCellDialog = ({
                 resolutionText: r.text,
                 resolutionId: null,
                 teamProvidedResolutionId: typeof r.id === 'string' ? r.id : null,
-                sourceType: 'member_provided',
+                sourceType: CellSourceType.MEMBER_PROVIDED,
                 sourceUserId: typeof r.fromUserId === 'string' ? r.fromUserId : null,
                 isEmpty: false,
               }))
@@ -245,7 +245,7 @@ export const EditCellDialog = ({
                                 return opt.label.toLowerCase().includes(q);
                             })
                             .map((opt) => {
-                                const isMemberProvided = opt.sourceType === 'member_provided';
+                                const isMemberProvided = opt.sourceType === CellSourceType.MEMBER_PROVIDED;
                                 const providerName = opt.sourceUserId ? (usernames[opt.sourceUserId] ?? 'Team member') : null;
                                 return (
                                     <button

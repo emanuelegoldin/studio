@@ -322,7 +322,10 @@ export async function addMessage(
   );
 
   const messageRows = await query<MessageAndUsernameRow[]>(
-    `SELECT * FROM review_messages WHERE id = ?`,
+    `SELECT msg.id, msg.content, u.username
+     FROM review_messages msg
+     JOIN users u ON msg.author_user_id = u.id
+     WHERE msg.id = ?`,
     [messageId]
   );
 

@@ -7,7 +7,7 @@ export enum TeamStatus {
 
 // Team membership role
 // Spec: 04-bingo-teams.md
-export enum TeamRole{
+export enum TeamRole {
   LEADER = 'leader',
   MEMBER = 'member'
 }

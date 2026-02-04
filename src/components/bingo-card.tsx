@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
 import { JokerCell } from "./cell/joker";
-import { ResoultionCell } from "./cell/resolution-cell";
+import { ResolutionCell } from "./cell/resolution-cell";
 
 interface BingoCell {
   id: string;
@@ -67,9 +67,9 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
       <div className="grid grid-cols-5 grid-rows-5 gap-2 md:gap-4">
         {sortedCells.map((cell) => (
           cell.isJoker ?
-          <JokerCell/>
+          <JokerCell key={cell.id} />
           :
-          <ResoultionCell
+          <ResolutionCell
               key={cell.id}
               cell={cell}
               isOwner={isOwner}

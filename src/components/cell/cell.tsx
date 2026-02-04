@@ -1,5 +1,4 @@
-import { CellState, ProofStatus } from "@/lib/shared/types";
-import { PropsWithChildren, useState } from "react"
+import { PropsWithChildren} from "react"
 
 export interface CellProps {
     cellClassName: string,

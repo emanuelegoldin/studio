@@ -1,5 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
-import { CellSourceType, CellState } from "@/lib/shared/types";
+import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
 import { cn } from "@/lib/utils";
 import { Check, Hourglass, ThumbsUp, X, Star } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -23,7 +23,7 @@ interface ResolutionCellProps {
     onRefresh?: () => void,
 }
 
-export const ResoultionCell = ({
+export const ResolutionCell = ({
     cell,
     existingCells,
     editMode,
@@ -93,7 +93,7 @@ export const ResoultionCell = ({
         if (!isModalOpen) {
             setModalMode(null);
         }
-    }, [isModalOpen]);
+    }, [isModalOpen, teamId, toast]);
 
     const stateConfig = {
         pending: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
@@ -105,18 +105,19 @@ export const ResoultionCell = ({
     // Determine visual state based on cell state and proof status
     let visualState: keyof typeof stateConfig = cell.state;
     if (cell.proof) {
-        if (cell.proof.status === 'pending') visualState = 'pending_review';
-        else if (cell.proof.status === 'declined') visualState = 'declined';
+        if (cell.proof.status === ProofStatus.PENDING) visualState = 'pending_review';
+        else if (cell.proof.status === ProofStatus.DECLINED) visualState = 'declined';
+        else if (cell.proof.status === ProofStatus.APPROVED) visualState = 'accomplished';
     }
 
     const config = stateConfig[visualState] || stateConfig.pending;
     // Spec: 09-bingo-card-editing.md - In edit mode, any non-joker, non-team cell is selectable (including empty)
-    const canEditContent = Boolean(editMode && isOwner && cell.sourceType !== 'team');
+    const canEditContent = Boolean(editMode && isOwner && cell.sourceType !== CellSourceType.TEAM);
     const canInteract =
         cell.state !== CellState.ACCOMPLISHED &&    // Accomplished cells have no interactions
         (
             canEditContent ||
-            (!editMode && !cell.isEmpty && (isOwner || cell.state === 'completed' || cell.state === 'pending_review'))
+            (!editMode && !cell.isEmpty && (isOwner || cell.state === CellState.COMPLETED || cell.state === CellState.PENDING_REVIEW))
         );
     return (
         <>
