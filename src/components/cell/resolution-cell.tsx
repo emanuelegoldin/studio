@@ -1,14 +1,14 @@
 import { useToast } from "@/hooks/use-toast";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
 import { cn } from "@/lib/utils";
-import { Check, Hourglass, ThumbsUp, X, Star } from "lucide-react";
+import { Check, Hourglass, ThumbsUp, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { MarkCellCompleteDialog } from "../dialogs/complete-dialog";
 import { EditCellDialog } from "../dialogs/edit-cell";
 import { RequestProofDialog } from "../dialogs/request-proof";
 import { CellThreadDialog } from "../dialogs/thread-dialog";
 import { Badge } from "../ui/badge";
-import { Cell, CellProps } from "./cell";
+import { Cell } from "./cell";
 import { BingoCell } from "./types";
 import { EmptyCell } from "./empty";
 
@@ -192,5 +192,5 @@ export const ResolutionCell = ({
                     onRefresh={onRefresh} />
             }
         </>
-    )
+    );
 }
