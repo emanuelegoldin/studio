@@ -11,11 +11,11 @@ import type {
   TeamProvidedResolution,
   TeamWithMembers,
   TeamMemberWithProfile,
-  TeamStatus,
 } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { getPublicUserProfile } from './user-repository';
 import type { RowDataPacket } from 'mysql2/promise';
+import { TeamStatus, TeamRole, InvitationStatus } from '../shared/types';
 
 // Row types from database (snake_case)
 interface TeamRow extends RowDataPacket {
@@ -32,7 +32,7 @@ interface MembershipRow extends RowDataPacket {
   id: string;
   team_id: string;
   user_id: string;
-  role: 'leader' | 'member';
+  role: TeamRole;
   joined_at: Date;
 }
 
@@ -42,7 +42,7 @@ interface InvitationRow extends RowDataPacket {
   invite_code: string;
   invited_email: string | null;
   invited_user_id: string | null;
-  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  status: InvitationStatus;
   expires_at: Date;
   created_at: Date;
 }

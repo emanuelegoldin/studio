@@ -3,6 +3,8 @@
  * Spec Reference: 00-system-overview.md - Core Concepts / Data
  */
 
+import { TeamStatus, TeamRole, InvitationStatus, CellSourceType, CellState, ProofStatus, ReviewDecision, DuplicateReportStatus, ThreadStatus, VoteType } from "../shared/types";
+
 // User entity
 // Spec: 00-system-overview.md, 01-authentication.md
 export interface User {
@@ -71,10 +73,6 @@ export interface Resolution {
   updatedAt: Date;
 }
 
-// Team status
-// Spec: 04-bingo-teams.md
-export type TeamStatus = 'forming' | 'started';
-
 // Team entity
 // Spec: 04-bingo-teams.md
 export interface Team {
@@ -87,10 +85,6 @@ export interface Team {
   updatedAt: Date;
 }
 
-// Team membership role
-// Spec: 04-bingo-teams.md
-export type TeamRole = 'leader' | 'member';
-
 // Team membership
 // Spec: 04-bingo-teams.md
 export interface TeamMembership {
@@ -100,10 +94,6 @@ export interface TeamMembership {
   role: TeamRole;
   joinedAt: Date;
 }
-
-// Team invitation status
-// Spec: 04-bingo-teams.md
-export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 
 // Team invitation
 // Spec: 04-bingo-teams.md
@@ -140,14 +130,6 @@ export interface BingoCard {
   createdAt: Date;
 }
 
-// Cell source type
-// Spec: 05-bingo-card-generation.md
-export type CellSourceType = 'team' | 'member_provided' | 'personal' | 'empty';
-
-// Cell state
-// Spec: 06-bingo-gameplay.md, Resolution Review & Proof Workflow
-export type CellState = 'pending' | 'completed' | 'pending_review' | 'accomplished';
-
 // Bingo cell
 // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md
 export interface BingoCell {
@@ -166,10 +148,6 @@ export interface BingoCell {
   updatedAt: Date;
 }
 
-// Proof status
-// Spec: 07-proof-and-approval.md, AGENTS.md
-export type ProofStatus = 'pending' | 'approved' | 'declined';
-
 // Cell proof
 // Spec: 07-proof-and-approval.md
 export interface CellProof {
@@ -182,10 +160,6 @@ export interface CellProof {
   updatedAt: Date;
 }
 
-// Proof review decision
-// Spec: 07-proof-and-approval.md
-export type ReviewDecision = 'approved' | 'declined';
-
 // Proof review
 // Spec: 07-proof-and-approval.md
 export interface ProofReview {
@@ -196,10 +170,6 @@ export interface ProofReview {
   comment: string | null;
   createdAt: Date;
 }
-
-// Duplicate report status
-// Spec: 05-bingo-card-generation.md
-export type DuplicateReportStatus = 'pending' | 'resolved';
 
 // Duplicate report
 // Spec: 05-bingo-card-generation.md
@@ -233,11 +203,6 @@ export interface BingoCellWithProof extends BingoCell {
   reviewThreadId?: string | null;
 }
 
-// Review thread types
-// Spec: Resolution Review & Proof Workflow
-
-export type ThreadStatus = 'open' | 'closed';
-
 export interface ReviewThread {
   id: string;
   cellId: string;
@@ -247,12 +212,10 @@ export interface ReviewThread {
   closedAt: Date | null;
 }
 
-export interface ReviewMessage {
+export interface ReviewMessageAndAuthor {
   id: string;
-  threadId: string;
-  authorUserId: string;
+  authorUsername: string;
   content: string;
-  createdAt: Date;
 }
 
 export interface ReviewFile {
@@ -266,8 +229,6 @@ export interface ReviewFile {
   createdAt: Date;
 }
 
-export type VoteType = 'accept' | 'deny';
-
 export interface ReviewVote {
   id: string;
   threadId: string;
@@ -280,7 +241,7 @@ export interface ReviewVote {
 // Extended types for API responses
 
 export interface ReviewThreadWithDetails extends ReviewThread {
-  messages: ReviewMessage[];
+  messages: ReviewMessageAndAuthor[];
   files: ReviewFile[];
   votes: ReviewVote[];
   cellResolutionText: string;

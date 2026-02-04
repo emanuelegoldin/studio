@@ -4,19 +4,18 @@
  */
 
 import { query, getConnection } from './connection';
-import type {
+import {
   BingoCard,
   BingoCell,
   BingoCellWithProof,
   BingoCardWithCells,
   CellProof,
-  CellState,
-  CellSourceType,
 } from './types';
 import { randomUUID } from 'crypto';
 import { getTeamById, getTeamMembers, isTeamMember } from './team-repository';
 import { getTeamProvidedResolutionsForUser } from './team-repository';
 import { getRandomResolutions } from './resolution-repository';
+import { CellSourceType, CellState, ProofStatus } from '../shared/types';
 
 // Row types from database
 interface CardRow {
@@ -48,7 +47,7 @@ interface ProofRow {
   cell_id: string;
   file_url: string | null;
   comment: string | null;
-  status: 'pending' | 'approved' | 'declined';
+  status: ProofStatus;
   created_at: Date;
   updated_at: Date;
 }
@@ -221,7 +220,7 @@ async function generateCardForUser(
         text: res.text,
         resolutionId: null,
         teamProvidedResolutionId: res.id,
-        sourceType: 'member_provided',
+        sourceType: CellSourceType.MEMBER_PROVIDED,
         sourceUserId: res.fromUserId,
         isJoker: false,
         isEmpty: false,
@@ -236,7 +235,7 @@ async function generateCardForUser(
       text: teamResolutionText,
       resolutionId: null,
       teamProvidedResolutionId: null,
-      sourceType: 'team',
+      sourceType: CellSourceType.TEAM,
       sourceUserId: null,
       isJoker: false,
       isEmpty: false,
@@ -260,7 +259,7 @@ async function generateCardForUser(
           text: res.text,
           resolutionId: res.id,
           teamProvidedResolutionId: null,
-          sourceType: 'personal',
+          sourceType: CellSourceType.PERSONAL,
           sourceUserId: userId,
           isJoker: false,
           isEmpty: false,
@@ -277,7 +276,7 @@ async function generateCardForUser(
       text: 'Empty',
       resolutionId: null,
       teamProvidedResolutionId: null,
-      sourceType: 'empty',
+      sourceType: CellSourceType.EMPTY,
       sourceUserId: null,
       isJoker: false,
       isEmpty: true,
@@ -470,9 +469,9 @@ async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]>
       resolutionText: 'Joker',
       isJoker: true,
       isEmpty: false,
-      sourceType: 'team',
+      sourceType: CellSourceType.TEAM,
       sourceUserId: null,
-      state: 'pending',
+      state: CellState.PENDING,
       createdAt: new Date(),
       updatedAt: new Date(),
       proof: null,

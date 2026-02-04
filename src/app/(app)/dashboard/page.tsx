@@ -13,6 +13,7 @@ import { Loader2, Users, Plus } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
+import { CellSourceType, CellState, ProofStatus } from '@/lib/shared/types';
 
 interface BingoCell {
   id: string;
@@ -21,13 +22,13 @@ interface BingoCell {
   resolutionText: string;
   isJoker: boolean;
   isEmpty: boolean;
-  sourceType: string;
+  sourceType: CellSourceType;
   sourceUserId: string | null;
-  state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
+  state: CellState;
   reviewThreadId?: string | null;
   proof: {
     id: string;
-    status: 'pending' | 'approved' | 'declined';
+    status: ProofStatus;
   } | null;
 }
 
@@ -136,6 +137,7 @@ export default function DashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
+  // TODO: consider moving the cell update logic at Card or Cell level
   const handleCellUpdate = async (teamId: string, cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response =

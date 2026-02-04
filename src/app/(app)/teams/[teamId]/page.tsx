@@ -31,6 +31,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
+import { CellSourceType, CellState, ProofStatus } from '@/lib/shared/types';
 
 interface TeamMember {
   membership: {
@@ -66,13 +67,13 @@ interface BingoCell {
   resolutionText: string;
   isJoker: boolean;
   isEmpty: boolean;
-  sourceType: string;
+  sourceType: CellSourceType;
   sourceUserId: string | null;
-  state: 'pending' | 'completed' | 'pending_review' | 'accomplished';
+  state: CellState;
   reviewThreadId?: string | null;
   proof: {
     id: string;
-    status: 'pending' | 'approved' | 'declined';
+    status: ProofStatus;
   } | null;
 }
 
@@ -383,7 +384,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
       setIsDeleting(false);
     }
   };
-
+ // TODO: consider moving the cell update logic at Card or Cell level
   const handleCellUpdate = async (cellId: string, newState: 'pending' | 'completed') => {
     try {
       const response =

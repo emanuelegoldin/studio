@@ -6,18 +6,17 @@
 import { query, getConnection } from './connection';
 import type {
   ReviewThread,
-  ReviewMessage,
+  ReviewMessageAndAuthor,
   ReviewFile,
   ReviewVote,
   ReviewThreadWithDetails,
-  ThreadStatus,
-  VoteType,
 } from './types';
 import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { PoolConnection } from 'mysql2/promise';
+import { ThreadStatus, VoteType } from '../shared/types';
 
 // Row types from database
 interface ThreadRow {
@@ -29,12 +28,10 @@ interface ThreadRow {
   closed_at: Date | null;
 }
 
-interface MessageRow {
+interface MessageAndUsernameRow {
   id: string;
-  thread_id: string;
-  author_user_id: string;
   content: string;
-  created_at: Date;
+  username: string;
 }
 
 interface FileRow {
@@ -78,13 +75,11 @@ function rowToThread(row: ThreadRow): ReviewThread {
   };
 }
 
-function rowToMessage(row: MessageRow): ReviewMessage {
+function rowToMessage(row: MessageAndUsernameRow): ReviewMessageAndAuthor {
   return {
     id: row.id,
-    threadId: row.thread_id,
-    authorUserId: row.author_user_id,
-    content: row.content,
-    createdAt: row.created_at,
+    authorUsername: row.username,
+    content: row.content
   };
 }
 
@@ -247,8 +242,11 @@ export async function getThreadById(
   }
 
   // Get messages
-  const messageRows = await query<MessageRow[]>(
-    `SELECT * FROM review_messages WHERE thread_id = ? ORDER BY created_at ASC`,
+  const messages = await query<MessageAndUsernameRow[]>(
+    `SELECT msg.id, msg.content, u.username 
+    FROM review_messages msg 
+    JOIN users u ON msg.author_user_id = u.id
+    WHERE msg.thread_id = ? ORDER BY msg.created_at ASC`,
     [threadId]
   );
 
@@ -268,7 +266,7 @@ export async function getThreadById(
     success: true,
     thread: {
       ...thread,
-      messages: messageRows.map(rowToMessage),
+      messages: messages.map(rowToMessage),
       files: fileRows.map(rowToFile),
       votes: voteRows.map(rowToVote),
       cellResolutionText: cellInfo.resolution_text,
@@ -284,7 +282,7 @@ export async function addMessage(
   threadId: string,
   authorUserId: string,
   content: string
-): Promise<{ success: boolean; message?: ReviewMessage; error?: string }> {
+): Promise<{ success: boolean; message?: ReviewMessageAndAuthor; error?: string }> {
   if (!content || content.trim().length === 0) {
     return { success: false, error: 'Message content is required' };
   }
@@ -323,8 +321,11 @@ export async function addMessage(
     [messageId, threadId, authorUserId, content.trim()]
   );
 
-  const messageRows = await query<MessageRow[]>(
-    `SELECT * FROM review_messages WHERE id = ?`,
+  const messageRows = await query<MessageAndUsernameRow[]>(
+    `SELECT msg.id, msg.content, u.username
+     FROM review_messages msg
+     JOIN users u ON msg.author_user_id = u.id
+     WHERE msg.id = ?`,
     [messageId]
   );
 
