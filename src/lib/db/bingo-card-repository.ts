@@ -300,15 +300,14 @@ async function generateCardForUser(
 
     await connection.execute(
       `INSERT INTO bingo_cells 
-       (id, card_id, position, resolution_id, team_provided_resolution_id, is_empty, source_type, source_user_id, state)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       (id, card_id, position, resolution_id, team_provided_resolution_id, source_type, source_user_id, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         cellId,
         cardId,
         position,
         data.resolutionId,
         data.teamProvidedResolutionId,
-        data.isEmpty,
         data.sourceType,
         data.sourceUserId,
       ]
