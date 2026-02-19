@@ -75,6 +75,35 @@ Each review thread is associated with:
 - All team members may post messages in the review thread.
 - Messages are deleted permanently when the thread closes.
 
+### Real-time Updates (WebSocket)
+
+Thread messages are also propagated in real-time to other users currently viewing the same review thread.
+
+- **Persistence remains HTTP-first**: the source of truth is still `POST /api/threads/[threadId]/messages`, which writes the message to MariaDB.
+- **Realtime fanout is WebSocket-based**: after persistence, the client emits a minimal WS message so other connected viewers can update immediately.
+
+#### Room Model
+
+- Each review thread is treated as a **room**.
+- The room id is the `threadId`.
+
+#### WebSocket URL
+
+- The client connects to `NEXT_PUBLIC_WS_URL`.
+- If unset, the client defaults to `ws(s)://<current-host>:8080`.
+
+#### WebSocket Messages
+
+- `join-thread` (client → server): joins the socket to a thread room.
+  - Body: `{ threadId: string }`
+- `thread-message` (client → server): indicates a new message was posted.
+  - Body: `{ threadId: string, username: string, content: string }`
+
+#### Broadcast Payload (server → clients)
+
+- Minimal payload: `{ username: string, content: string }`
+- This payload is **non-authoritative** (no ids/timestamps). On receipt, clients should re-fetch the thread via `GET /api/threads/[threadId]` to display the persisted message with correct metadata.
+
 ---
 
 ## Voting & Approval

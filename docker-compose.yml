@@ -51,7 +51,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
     env_file:
-      - .env
+      - nextjs/.env
     environment:
       DB_HOST: mariadb
       DB_PORT: 3306                   # Do not override DB_PORT if custom port is used - read from .env file
@@ -70,8 +70,22 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
+      ws-server:
+        condition: service_started
       mariadb:
         condition: service_healthy
+  ws-server:
+    build:
+      context: ./ws-server/
+      dockerfile: Dockerfile
+    image: nyr-bingo-ws-server:local
+    container_name: nyr-bingo-ws-server
+    env_file:
+      - ws-server/.env
+    environment:
+      - HOSTNAME=0.0.0.0
+    ports:
+      - "8888:8888"
   nginx:
     build:
       context: ./nextjs/

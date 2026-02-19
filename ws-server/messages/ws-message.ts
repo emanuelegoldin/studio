@@ -1,4 +1,4 @@
 export interface WSMessage {
-    type: 'thread-message';
+    type: string;
     body?: Record<string, any>;
 }
