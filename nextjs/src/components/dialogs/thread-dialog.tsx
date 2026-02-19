@@ -9,12 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 function getWsUrl(): string | null {
-  // Prefer the build-time env var if set (local dev outside Docker)
-  const env = process.env.NEXT_PUBLIC_WS_URL;
-  if (env && (env.startsWith('ws://') || env.startsWith('wss://'))) {
-    return env.replace(/\/$/, '');
-  }
-  // In production / Docker, derive from current page origin via nginx /ws proxy
   if (typeof window !== 'undefined') {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/ws`;
@@ -51,18 +45,6 @@ export const CellThreadDialog = ({
     const { toast } = useToast();
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-
-    // const refreshThread = async (threadIdOverride?: string) => {
-    //     const threadId = threadIdOverride ?? cell.reviewThreadId ?? thread?.id;
-    //     if (!threadId) return;
-    //     try {
-    //       const res = await fetch(`/api/threads/${threadId}`);
-    //       const data = await res.json().catch(() => ({}));
-    //     if (res.ok) setThread(data.thread);
-    //     } catch {
-    //     // ignore
-    //     }
-    // };
 
     useEffect(() => {
       if (!isOpen) return;
@@ -119,7 +101,7 @@ export const CellThreadDialog = ({
         const { username, content } = data as Partial<ThreadMessageBroadcast>;
         if (typeof username !== 'string' || typeof content !== 'string') return;
 
-        // TODO: what should we do if the database update fails?
+        // Optimistic update of sent message - TODO: should we prefer pessimistic update?
         if (thread && thread.id === threadId) {
           setThread({
             ...thread,
