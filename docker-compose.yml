@@ -2,7 +2,7 @@ name: nyr-bingo-docker-compose
 services:
   mariadb:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.mariadb
 # Uncomment the following lines to set a custom port via build argument
       # args:
@@ -27,7 +27,7 @@ services:
       retries: 20
   flyway:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.flyway
     image: nyr-bingo-flyway:local
     container_name: nyr-bingo-db-migrator
@@ -44,7 +44,7 @@ services:
         condition: service_healthy
   nextjs-app:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.nextjs
     image: nyr-bingo-nextjs:local
     container_name: nyr-bingo-nextjs
@@ -74,7 +74,7 @@ services:
         condition: service_healthy
   nginx:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.nginx
     image: nyr-bingo-nginx:local
     container_name: nyr-bingo-nginx
