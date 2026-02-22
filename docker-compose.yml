@@ -49,7 +49,7 @@ services:
     image: nyr-bingo-nextjs:local
     container_name: nyr-bingo-nextjs
     volumes:
-      - ./uploads:/app/uploads
+      - ./nextjs/uploads:/app/uploads
     env_file:
       - nextjs/.env
     environment:
@@ -93,7 +93,7 @@ services:
     image: nyr-bingo-nginx:local
     container_name: nyr-bingo-nginx
     volumes:
-      - ./uploads:/uploads:ro
+      - ./nextjs/uploads:/uploads:ro
     ports:
       - "80:80"
       - "443:443"
