@@ -21,7 +21,7 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
       interval: 5s
       timeout: 3s
       retries: 20
