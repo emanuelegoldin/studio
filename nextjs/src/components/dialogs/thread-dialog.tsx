@@ -46,6 +46,31 @@ export const CellThreadDialog = ({
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
 
+  const refetchThread = async () => {
+    const threadId = cell.reviewThreadId || thread?.id;
+    if (!threadId) return;
+
+    try {
+      const res = await fetch(`/api/threads/${threadId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: 'Error',
+          description: data?.error || 'Failed to refresh review thread',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setThread(data.thread);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh review thread',
+        variant: 'destructive',
+      });
+    }
+  };
+
     useEffect(() => {
       if (!isOpen) return;
       let cancelled = false;
@@ -88,27 +113,7 @@ export const CellThreadDialog = ({
         ws.send(JSON.stringify(joinMessage));
       };
 
-      ws.onmessage = (event) => {
-        if (typeof event.data !== 'string') return;
-        let data: unknown;
-        try {
-          data = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-
-        if (!data || typeof data !== 'object') return;
-        const { username, content } = data as Partial<ThreadMessageBroadcast>;
-        if (typeof username !== 'string' || typeof content !== 'string') return;
-
-        // Optimistic update of sent message - TODO: should we prefer pessimistic update?
-        if (thread && thread.id === threadId) {
-          setThread({
-            ...thread,
-            messages: [...(thread.messages || []), { id: `temp-${Date.now()}`, authorUsername: username, content }],
-          });
-        }
-      };
+    ws.onmessage = () => { refetchThread(); };
 
       ws.onerror = (e) => {
         console.error('WebSocket error occurred:', e);
@@ -252,12 +257,10 @@ export const CellThreadDialog = ({
 
         const ws = wsRef.current;
         if (ws && ws.readyState === WebSocket.OPEN) {
-          const wsMessage: ThreadMessageWSMessage = {
-            type: 'thread-message',
+        const wsMessage: ThreadRefreshMessage = {
+          type: 'thread-refresh',
             body: {
               threadId,
-              username: currentUsername ?? 'User',
-              content,
             },
           };
           ws.send(JSON.stringify(wsMessage));

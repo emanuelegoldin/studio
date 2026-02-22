@@ -1,10 +1,8 @@
 import { WSMessage } from "./ws-message";
 
-export interface ThreadMessage extends WSMessage {
-  type: 'thread-message';
+export interface ThreadRefreshMessage extends WSMessage {
+  type: 'thread-refresh';
   body: {
     threadId: string;
-    username: string;
-    content: string;
   }
 }

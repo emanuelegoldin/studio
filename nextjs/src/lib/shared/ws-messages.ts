@@ -5,16 +5,9 @@ type JoinThreadWSMessage = {
   };
 };
 
-type ThreadMessageWSMessage = {
-  type: 'thread-message';
+type ThreadRefreshMessage = {
+  type: 'thread-refresh';
   body: {
     threadId: string;
-    username: string;
-    content: string;
   };
-};
-
-type ThreadMessageBroadcast = {
-  username: string;
-  content: string;
 };

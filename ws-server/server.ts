@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { ThreadMessage } from './messages/thread-message';
+import { ThreadRefreshMessage } from './messages/thread-message';
 import { JoinThreadMessage } from './messages/join-thread';
 console.log('Starting WebSocket server on port', process.env.WS_PORT);
 const WS_PORT: number = parseInt(process.env.WS_PORT || '8888', 10);
@@ -43,14 +43,12 @@ wss.on('connection', function connection(ws) {
       return;
     }
 
-    if (msgType === 'thread-message') {
-      const { threadId, username, content } = (message as ThreadMessage).body ?? {};
+    if (msgType === 'thread-refresh') {
+      const { threadId } = (message as ThreadRefreshMessage).body ?? {};
       if (!threadId || typeof threadId !== 'string') return;
-      if (!username || typeof username !== 'string') return;
-      if (!content || typeof content !== 'string') return;
 
-      joinRoom(threadId, ws);
-      broadcastToRoom(threadId, { username, content }, ws);
+      // joinRoom(threadId, ws);
+      broadcastToRoom(threadId, ws);
     }
   });
 });
@@ -71,9 +69,9 @@ function joinRoom(roomId: string, ws: WebSocket) {
   joinedRooms.add(roomId);
 }
 
+// Used to trigger re-fetch of thread.
 function broadcastToRoom(
   roomId: string,
-  data: { username: string; content: string },
   exceptSocket: WebSocket | null = null
 ) {
   const room = rooms.get(roomId);
@@ -81,7 +79,7 @@ function broadcastToRoom(
 
   for (const client of room) {
     if (client.readyState === WebSocket.OPEN && client !== exceptSocket) {
-      client.send(JSON.stringify(data));
+      client.send(JSON.stringify({ type: 'refresh-thread' }));
     }
   }
 }
