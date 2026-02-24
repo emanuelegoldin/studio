@@ -5,6 +5,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { CellDialog } from "./cell-dialog"
+import { VoteBar } from "./vote-bar";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,6 +44,7 @@ export const CellThreadDialog = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
   const refetchThread = async () => {
@@ -79,8 +81,12 @@ export const CellThreadDialog = ({
         const res = await fetch('/api/profile');
         const data = await res.json().catch(() => ({}));
         const username = data?.user?.username;
+        const userId = data?.user?.id;
         if (!cancelled && res.ok && typeof username === 'string' && username) {
           setCurrentUsername(username);
+        }
+        if (!cancelled && res.ok && typeof userId === 'string' && userId) {
+          setCurrentUserId(userId);
         }
       } catch {
         // ignore
@@ -171,32 +177,7 @@ export const CellThreadDialog = ({
     setSelectedFile(file);
   };
 
-  const handleVote = async (vote: 'accept' | 'deny') => {
-    const threadId = cell.reviewThreadId || thread?.id;
-    if (!threadId) return;
-    if (isSubmitting) return;
 
-    setIsSubmitting(true);
-    try {
-      const res = await fetch(`/api/threads/${threadId}/vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vote }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast({
-          title: 'Error',
-          description: data?.error || 'Failed to submit vote',
-          variant: 'destructive',
-        });
-        return;
-      }
-      onRefresh?.();
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleUploadFileToThread = async () => {
     const threadId = cell.reviewThreadId || thread?.id;
@@ -378,19 +359,26 @@ export const CellThreadDialog = ({
               )}
             </div>
 
-            {!isOwner && thread.status === 'open' && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Vote</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleVote('accept')} disabled={isSubmitting}>
-                    Accept
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleVote('deny')} disabled={isSubmitting}>
-                    Deny
-                  </Button>
-                </div>
-              </div>
-            )}
+            <VoteBar
+              threadId={(cell.reviewThreadId || thread.id) as string}
+              votes={thread.votes ?? []}
+              currentUserId={currentUserId}
+              threadOpen={thread.status === 'open'}
+              canVote={!isOwner}
+              onVoteSubmitted={() => {
+                const ws = wsRef.current;
+                const tid = cell.reviewThreadId || thread.id;
+                if (ws && ws.readyState === WebSocket.OPEN && tid) {
+                  const wsMessage: ThreadRefreshMessage = {
+                    type: 'thread-refresh',
+                    body: { threadId: tid },
+                  };
+                  ws.send(JSON.stringify(wsMessage));
+                }
+                refetchThread();
+                onRefresh?.();
+              }}
+            />
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Messages</p>
