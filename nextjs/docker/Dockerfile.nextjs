@@ -1,0 +1,27 @@
+# Used https://depot.dev/docs/container-builds/optimal-dockerfiles/node-pnpm-dockerfile as starting point
+FROM node:lts-slim AS base
+WORKDIR /app
+RUN corepack enable pnpm
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+COPY . .
+# Outputs to `.next/standalone`
+RUN pnpm run build
+
+FROM node:lts-slim AS runner
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+WORKDIR /app
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -m -d /app -s /bin/false appuser
+COPY --from=builder --chown=appuser:appgroup /app/.next/standalone ./
+COPY --from=builder --chown=appuser:appgroup /app/.next/static ./.next/static
+COPY --from=builder --chown=appuser:appgroup /app/public ./public
+ENV NODE_ENV=production
+USER appuser
+EXPOSE 3000
+ENTRYPOINT ["node", "server.js"]

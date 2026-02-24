@@ -1,0 +1,9 @@
+node_modules/
+.env*
+.gitignore
+.next
+.github
+.devcontainer
+.idx
+*.md
+docker/

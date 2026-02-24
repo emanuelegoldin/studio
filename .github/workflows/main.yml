@@ -5,12 +5,12 @@ on:
     branches: [ main ]
     paths-ignore:
       - 'docs/**'
-      - 'specs/**'
-      - '*.example'
-      - '*.md'
-      - '.dockerignore'
-      - '.gitignore'
-      - '.modified'
+      - 'nextjs/specs/**'
+      - '**/*.example'
+      - '**/*.md'
+      - '**/.dockerignore'
+      - '**/.gitignore'
+      - '**/.modified'
       - '.devcontainer/**'
       
 permissions:
@@ -20,6 +20,11 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  MARIADB_DOCKERFILE: nextjs/docker/Dockerfile.mariadb
+  NGINX_DOCKERFILE: nextjs/docker/Dockerfile.nginx
+  NEXTJS_DOCKERFILE: nextjs/docker/Dockerfile.nextjs
+  FLYWAY_DOCKERFILE: nextjs/docker/Dockerfile.flyway
+  NEXTJS_APP_CONTEXT: nextjs/
 
 jobs:
   build:
@@ -38,8 +43,8 @@ jobs:
           docker build \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/mariadb:latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/mariadb:${{ github.sha }} \
-            -f docker/Dockerfile.mariadb \
-            .
+            -f ${{ env.MARIADB_DOCKERFILE }} \
+            ${{ env.NEXTJS_APP_CONTEXT }}
       - name: Push MariaDB image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/mariadb:latest
@@ -49,8 +54,8 @@ jobs:
           docker build \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nginx:latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nginx:${{ github.sha }} \
-            -f docker/Dockerfile.nginx \
-            .
+            -f ${{ env.NGINX_DOCKERFILE }} \
+            ${{ env.NEXTJS_APP_CONTEXT }}
       - name: Push Nginx image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nginx:latest
@@ -60,8 +65,8 @@ jobs:
           docker build \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nextjs-app:latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nextjs-app:${{ github.sha }} \
-            -f docker/Dockerfile.nextjs \
-            .
+            -f ${{ env.NEXTJS_DOCKERFILE }} \
+            ${{ env.NEXTJS_APP_CONTEXT }}
       - name: Push Next.js image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/nextjs-app:latest
@@ -71,8 +76,8 @@ jobs:
           docker build \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/flyway:latest \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/flyway:${{ github.sha }} \
-            -f docker/Dockerfile.flyway \
-            .
+            -f ${{ env.FLYWAY_DOCKERFILE }} \
+            ${{ env.NEXTJS_APP_CONTEXT }}
       - name: Push Flyway image
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/flyway:latest

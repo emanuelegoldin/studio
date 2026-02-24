@@ -2,7 +2,7 @@ name: nyr-bingo-docker-compose
 services:
   mariadb:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.mariadb
 # Uncomment the following lines to set a custom port via build argument
       # args:
@@ -12,7 +12,7 @@ services:
     ports:
       - "3306:3306"
     env_file:
-      - .env
+      - nextjs/.env
     environment:
       MARIADB_DATABASE: resolution_bingo
       MARIADB_USER: ${DB_USER}
@@ -21,18 +21,18 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
       interval: 5s
       timeout: 3s
       retries: 20
   flyway:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.flyway
     image: nyr-bingo-flyway:local
     container_name: nyr-bingo-db-migrator
     env_file:
-      - .env
+      - nextjs/.env
     command: >
       -url=jdbc:mariadb://mariadb:3306/resolution_bingo
       -user=${DB_USER}
@@ -44,14 +44,14 @@ services:
         condition: service_healthy
   nextjs-app:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.nextjs
     image: nyr-bingo-nextjs:local
     container_name: nyr-bingo-nextjs
     volumes:
-      - ./uploads:/app/uploads
+      - ./nextjs/uploads:/app/uploads
     env_file:
-      - .env
+      - nextjs/.env
     environment:
       DB_HOST: mariadb
       DB_PORT: 3306                   # Do not override DB_PORT if custom port is used - read from .env file
@@ -70,16 +70,30 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
+      ws-server:
+        condition: service_started
       mariadb:
         condition: service_healthy
+  ws-server:
+    build:
+      context: ./ws-server/
+      dockerfile: Dockerfile
+    image: nyr-bingo-ws-server:local
+    container_name: nyr-bingo-ws-server
+    env_file:
+      - ws-server/.env
+    environment:
+      - HOSTNAME=0.0.0.0
+    ports:
+      - "8888:8888"
   nginx:
     build:
-      context: .
+      context: ./nextjs/
       dockerfile: docker/Dockerfile.nginx
     image: nyr-bingo-nginx:local
     container_name: nyr-bingo-nginx
     volumes:
-      - ./uploads:/uploads:ro
+      - ./nextjs/uploads:/uploads:ro
     ports:
       - "80:80"
       - "443:443"
