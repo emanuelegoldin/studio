@@ -376,6 +376,10 @@ export const CellThreadDialog = ({
                   ws.send(JSON.stringify(wsMessage));
                 }
                 refetchThread();
+                // onRefresh is wrapped by BingoCard to broadcast a
+                // card-refresh after the async reload completes.
+                // This covers vote outcomes that change cell state
+                // (e.g. accomplished or reverted to pending).
                 onRefresh?.();
               }}
             />

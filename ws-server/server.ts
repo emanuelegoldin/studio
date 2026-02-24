@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { ThreadRefreshMessage } from './messages/thread-message';
 import { JoinThreadMessage } from './messages/join-thread';
+import { JoinCardRoomMessage, CardRefreshMessage } from './messages/card-message';
 console.log('Starting WebSocket server on port', process.env.WS_PORT);
 const WS_PORT: number = parseInt(process.env.WS_PORT || '8888', 10);
 const wss = new WebSocketServer({ port: WS_PORT });
@@ -49,6 +50,20 @@ wss.on('connection', function connection(ws) {
 
       // joinRoom(threadId, ws);
       broadcastToRoom(threadId, ws);
+    }
+
+    // ── Card-level rooms (keyed by teamId) ────────────────────────
+    if (msgType === 'join-card-room') {
+      const { teamId } = (message as JoinCardRoomMessage).body ?? {};
+      if (!teamId || typeof teamId !== 'string') return;
+      joinRoom(`card:${teamId}`, ws);
+      return;
+    }
+
+    if (msgType === 'card-refresh') {
+      const { teamId } = (message as CardRefreshMessage).body ?? {};
+      if (!teamId || typeof teamId !== 'string') return;
+      broadcastToRoom(`card:${teamId}`, ws);
     }
   });
 });

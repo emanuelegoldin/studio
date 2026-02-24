@@ -37,6 +37,7 @@ export const ResolutionCell = ({
     const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | null>(null);
     const [usernames, setUsernames] = useState<Record<string, string>>({});
     const { toast } = useToast();
+
     const handleClick = () => {
         if (!canInteract) return;
         if (canEditContent) {

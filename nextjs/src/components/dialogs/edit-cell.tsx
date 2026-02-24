@@ -211,6 +211,8 @@ export const EditCellDialog = ({
         setEditOptions([]);
         setUsernames({});
         setIsOpen(false);
+        // onRefresh is wrapped by BingoCard to broadcast a
+        // card-refresh after the async reload completes.
         onRefresh?.();
         } finally {
         setIsSubmitting(false);

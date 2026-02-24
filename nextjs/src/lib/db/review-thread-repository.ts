@@ -189,11 +189,19 @@ export async function requestProof(
       [threadId, cellId, cellInfo.card_user_id]
     );
 
-    // Update cell state to pending_review
-    await connection.execute(
-      `UPDATE bingo_cells SET state = 'pending_review' WHERE id = ?`,
+    // Optimistic lock: only transition if cell is still in 'completed' state.
+    // This prevents races with the owner undoing completion concurrently.
+    // Owner actions prevail — if the owner already reverted the cell to
+    // 'pending', this UPDATE touches 0 rows and we roll back.
+    const [updateResult] = await connection.execute(
+      `UPDATE bingo_cells SET state = 'pending_review' WHERE id = ? AND state = 'completed'`,
       [cellId]
     );
+    const affectedRows = (updateResult as { affectedRows: number }).affectedRows;
+    if (affectedRows === 0) {
+      await connection.rollback();
+      return { success: false, error: 'Cell state changed — the owner may have undone the completion' };
+    }
 
     await connection.commit();
 

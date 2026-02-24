@@ -534,11 +534,30 @@ export async function updateCellState(
     return { success: false, error: 'Cannot directly set pending_review state' };
   }
 
-  // Update the state
-  await query(
-    `UPDATE bingo_cells SET state = ? WHERE id = ?`,
-    [newState, cellId]
+  // Determine which source states are valid for this transition.
+  // Using a WHERE guard prevents races with concurrent proof requests.
+  let validFromStates: string[];
+  if (newState === 'completed') {
+    validFromStates = ['pending'];
+  } else if (newState === 'pending') {
+    validFromStates = ['completed'];
+  } else if (newState === 'accomplished') {
+    validFromStates = ['pending_review'];
+  } else {
+    validFromStates = ['pending', 'completed', 'pending_review', 'accomplished'];
+  }
+
+  const placeholders = validFromStates.map(() => '?').join(', ');
+  const updateResult = await query<{ affectedRows: number }>(
+    `UPDATE bingo_cells SET state = ? WHERE id = ? AND state IN (${placeholders})`,
+    [newState, cellId, ...validFromStates]
   );
+
+  // For UPDATE queries, query<T>() returns the mysql2 ResultSetHeader
+  // which has an affectedRows field.
+  if (updateResult.affectedRows === 0) {
+    return { success: false, error: 'Cell state has changed — please refresh and try again' };
+  }
 
   const updatedRow = await getResolvedCellRowById(cellId);
   if (!updatedRow) {
@@ -703,11 +722,20 @@ export async function undoCompletion(
       );
     }
 
-    // Update cell state to pending
-    await connection.execute(
-      `UPDATE bingo_cells SET state = 'pending' WHERE id = ?`,
+    // Optimistic lock: only transition if cell is still in a valid
+    // "completable" state.  Owner actions prevail over concurrent
+    // proof-request operations — if a team member moved the cell to
+    // pending_review in the meantime, we still honour the owner's undo
+    // because the thread closure above already handled that thread.
+    const [undoResult] = await connection.execute(
+      `UPDATE bingo_cells SET state = 'pending' WHERE id = ? AND state IN ('completed', 'pending_review', 'accomplished')`,
       [cellId]
     );
+    const affectedRows = (undoResult as { affectedRows: number }).affectedRows;
+    if (affectedRows === 0) {
+      await connection.rollback();
+      return { success: false, error: 'Cell is not in a completable state' };
+    }
 
     await connection.commit();
 

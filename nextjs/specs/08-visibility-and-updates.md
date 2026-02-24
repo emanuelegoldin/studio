@@ -19,10 +19,7 @@ Let users view other users' bingo cards in the same competition context and ensu
 ### Updates
 - When a user changes their card state (mark complete/revert) or submits proof:
   - other team members should see the updated state.
-- Mechanism is not specified. Acceptable implementation options:
-  - polling
-  - server-sent events
-  - WebSockets
+- Implementation: WebSocket-based real-time propagation — see **11 — Real-Time Card Updates** for full details.
 - The spec requirement is the observable behavior: updates become visible without requiring manual out-of-band coordination.
 
 ## Permissions
