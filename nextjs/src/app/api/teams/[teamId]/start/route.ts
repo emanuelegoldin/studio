@@ -9,6 +9,7 @@ import {
   startBingoGame, 
   isTeamLeader,
   getTeamWithMembers,
+  initializeTeamLeaderboard,
 } from '@/lib/db';
 import { generateBingoCardsForTeam } from '@/lib/db/bingo-card-repository';
 
@@ -68,6 +69,12 @@ export async function POST(
 
     // Get updated team data
     const team = await getTeamWithMembers(teamId);
+
+    // Initialize persisted leaderboard rows for all team members
+    if (team) {
+      const memberIds = team.members.map((m) => m.user.userId);
+      await initializeTeamLeaderboard(teamId, memberIds);
+    }
 
     return NextResponse.json({ 
       message: 'Bingo game started successfully',

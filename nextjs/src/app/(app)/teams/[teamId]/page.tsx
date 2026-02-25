@@ -2,18 +2,21 @@
 
 /**
  * Team Detail Page
- * Spec Reference: 04-bingo-teams.md, 05-bingo-card-generation.md, 06-bingo-gameplay.md
+ * Spec Reference: 04-bingo-teams.md, 05-bingo-card-generation.md, 06-bingo-gameplay.md, 12-team-tabs.md
+ *
+ * The page is organised into three tabs:
+ *   1. Cards   — bingo cards for every member (existing functionality)
+ *   2. Members — simple member list with clickable avatars
+ *   3. Leaderboard — ranked table of first-bingo times
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { BingoCard } from "@/components/bingo-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -31,67 +34,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useSetAppHeaderTitle } from "@/components/app-header-title";
-import { CellSourceType, CellState, ProofStatus } from '@/lib/shared/types';
 
-interface TeamMember {
-  membership: {
-    id: string;
-    teamId: string;
-    userId: string;
-    role: 'leader' | 'member';
-    joinedAt: string;
-  };
-  user: {
-    id: string;
-    userId: string;
-    username: string;
-    displayName: string | null;
-    bio: string | null;
-    avatarUrl: string | null;
-  };
-}
-
-interface Team {
-  id: string;
-  name: string;
-  leaderUserId: string;
-  teamResolutionText: string | null;
-  status: 'forming' | 'started';
-  members: TeamMember[];
-}
-
-interface BingoCell {
-  id: string;
-  cardId: string;
-  position: number;
-  resolutionText: string;
-  isJoker: boolean;
-  isEmpty: boolean;
-  sourceType: CellSourceType;
-  sourceUserId: string | null;
-  state: CellState;
-  reviewThreadId?: string | null;
-  proof: {
-    id: string;
-    status: ProofStatus;
-  } | null;
-}
-
-interface BingoCardData {
-  id: string;
-  teamId: string;
-  userId: string;
-  gridSize: number;
-  cells: BingoCell[];
-}
-
-interface TeamProvidedResolution {
-  id: string;
-  teamId: string;
-  fromUserId: string;
-  toUserId: string;
-  text: string;
-}
+import { CardsTab } from "./cards-tab";
+import { MembersTab } from "./members-tab";
+import { LeaderboardTab } from "./leaderboard-tab";
+import type { Team, BingoCardData, TeamProvidedResolution } from "./types";
 
 export default function TeamDetailPage({ params }: { params: Promise<{ teamId: string }> }) {
   useSetAppHeaderTitle("Team");
@@ -631,64 +578,33 @@ export default function TeamDetailPage({ params }: { params: Promise<{ teamId: s
           </div>
         </CardHeader>
       </Card>
-      
-      {team.status === 'forming' && (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <h3 className="text-xl font-semibold font-headline mb-2">Game Not Started Yet</h3>
-            <p className="text-muted-foreground">
-              {isLeader 
-                ? "Set the team resolution and ensure all members have proposed resolutions for each other, then start the game."
-                : "The team leader will start the game once everyone has proposed resolutions for each other."}
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
-      {team.status === 'started' && cards.length > 0 && (
-        <div className="space-y-8">
-          <h2 className="text-2xl font-bold font-headline">Team Members & Bingo Cards</h2>
-          {team.members.map((member, index) => {
-            const card = cards.find(c => c.userId === member.user.userId);
-            const isCurrentUser = member.user.userId === currentUserId;
-            
-            return (
-              <div key={member.user.userId}>
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {(member.user.displayName || member.user.username)?.charAt(0) || '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <CardTitle className="font-headline text-xl">
-                        {member.user.displayName || member.user.username}
-                        {isCurrentUser && " (You)"}
-                      </CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {card ? (
-                      <BingoCard 
-                        cells={card.cells} 
-                        isOwner={isCurrentUser}
-                        teamId={team.id}
-                        currentUserId={currentUserId}
-                        onCellUpdate={isCurrentUser ? handleCellUpdate : undefined}
-                        onRefresh={reloadCards}
-                      />
-                    ) : (
-                      <p className="text-muted-foreground text-center py-8">No bingo card available</p>
-                    )}
-                  </CardContent>
-                </Card>
-                {index < team.members.length - 1 && <Separator className="my-8"/>}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* ── Tab navigation ────────────────────────────────────── */}
+      <Tabs defaultValue="cards">
+        <TabsList>
+          <TabsTrigger value="cards">Cards</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cards" className="mt-6">
+          <CardsTab
+            team={team}
+            cards={cards}
+            currentUserId={currentUserId}
+            onCellUpdate={handleCellUpdate}
+            onRefresh={reloadCards}
+          />
+        </TabsContent>
+
+        <TabsContent value="members" className="mt-6">
+          <MembersTab team={team} currentUserId={currentUserId} />
+        </TabsContent>
+
+        <TabsContent value="leaderboard" className="mt-6">
+          <LeaderboardTab teamId={teamId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

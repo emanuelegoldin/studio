@@ -16,6 +16,7 @@ import { getTeamById, getTeamMembers, isTeamMember } from './team-repository';
 import { getTeamProvidedResolutionsForUser } from './team-repository';
 import { getRandomResolutions } from './resolution-repository';
 import { CellSourceType, CellState, ProofStatus } from '../shared/types';
+import { refreshLeaderboardEntry } from './leaderboard-repository';
 
 // Row types from database
 interface CardRow {
@@ -500,9 +501,9 @@ export async function updateCellState(
 
   // Get the cell and verify ownership
   const cellRows = await query<Array<
-    { id: string; is_empty: boolean | number; state: CellState; card_user_id: string }
+    { id: string; is_empty: boolean | number; state: CellState; card_user_id: string; team_id: string }
   >>(
-    `SELECT c.id, c.is_empty, c.state, bc.user_id as card_user_id
+    `SELECT c.id, c.is_empty, c.state, bc.user_id as card_user_id, bc.team_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -559,6 +560,9 @@ export async function updateCellState(
     return { success: false, error: 'Cell state has changed — please refresh and try again' };
   }
 
+  // Refresh persisted leaderboard data after state change
+  await refreshLeaderboardEntry(cell.team_id, userId);
+
   const updatedRow = await getResolvedCellRowById(cellId);
   if (!updatedRow) {
     return { success: false, error: 'Cell not found' };
@@ -575,7 +579,6 @@ export async function updateCellContent(
     teamProvidedResolutionId: string | null;
     sourceType: CellSourceType;
     sourceUserId: string | null;
-    isEmpty: boolean;
   }
 ): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
 
@@ -616,14 +619,6 @@ export async function updateCellContent(
     return { success: false, error: 'Team resolution cell cannot be modified' };
   }
 
-  // Keep empty flag consistent with source type
-  if (update.isEmpty && update.sourceType !== 'empty') {
-    return { success: false, error: 'Empty cells must have sourceType "empty"' };
-  }
-  if (!update.isEmpty && update.sourceType === 'empty') {
-    return { success: false, error: 'Non-empty cells cannot have sourceType "empty"' };
-  }
-
   // Prevent storing ids for types that shouldn't have them
   if (update.sourceType === 'team' || update.sourceType === 'empty') {
     if (update.resolutionId || update.teamProvidedResolutionId) {
@@ -643,10 +638,9 @@ export async function updateCellContent(
          team_provided_resolution_id = ?,
          source_type = ?,
          source_user_id = ?,
-         is_empty = ?,
          state = 'pending'
      WHERE id = ?`,
-    [resolutionId, teamProvidedResolutionId, update.sourceType, sourceUserId, update.isEmpty, cellId]
+    [resolutionId, teamProvidedResolutionId, update.sourceType, sourceUserId, cellId]
   );
 
   const updatedRow = await getResolvedCellRowById(cellId);
@@ -664,8 +658,8 @@ export async function undoCompletion(
   cellId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
-  const cellRows = await query<(CellRow & { card_user_id: string })[]>(
-    `SELECT c.*, bc.user_id as card_user_id
+  const cellRows = await query<(CellRow & { card_user_id: string; team_id: string })[]>(
+    `SELECT c.*, bc.user_id as card_user_id, bc.team_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -738,6 +732,9 @@ export async function undoCompletion(
     }
 
     await connection.commit();
+
+    // Refresh persisted leaderboard data after undo
+    await refreshLeaderboardEntry(cell.team_id, userId);
 
     const updatedRows = await query<CellRow[]>(
       `SELECT * FROM bingo_cells WHERE id = ?`,
