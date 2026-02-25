@@ -526,7 +526,7 @@ export async function submitVote(
     }
 
     await connection.commit();
-    deleteThreadFiles(fileRows)
+    await deleteThreadFiles(fileRows)
 
     // Refresh persisted leaderboard data after vote-driven state change
     if (threadClosed) {
