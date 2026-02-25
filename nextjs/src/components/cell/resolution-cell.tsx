@@ -11,6 +11,7 @@ import { Badge } from "../ui/badge";
 import { Cell } from "./cell";
 import { BingoCell } from "./types";
 import { EmptyCell } from "./empty";
+import Link from "next/link";
 
 interface ResolutionCellProps {
     cell: BingoCell,
@@ -145,7 +146,17 @@ export const ResolutionCell = ({
                     </div>
                     <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
                         {cell.sourceType === CellSourceType.TEAM && "Team Goal"}
-                        {cell.sourceType === CellSourceType.MEMBER_PROVIDED && (cell.sourceUserId ? (usernames[cell.sourceUserId] ?? "Team member") : "Team member")}
+                        {cell.sourceType === CellSourceType.MEMBER_PROVIDED && (
+                          cell.sourceUserId ? (
+                            <Link
+                              href={`/profile/${cell.sourceUserId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="hover:underline"
+                            >
+                              {usernames[cell.sourceUserId] ?? "Team member"}
+                            </Link>
+                          ) : "Team member"
+                        )}
                         {cell.sourceType === CellSourceType.PERSONAL && "Personal"}
                     </Badge>
                 </Cell>
