@@ -85,3 +85,19 @@ Allow users to manage their profile information, configure field-level privacy, 
 - Users can see their verification status.
 - Unverified users can request a new verification email.
 - Other users only see public profile fields.
+
+---
+
+## Public Profile Page
+
+A dedicated page at `/profile/[userId]` displays a read-only view of another
+user's profile:
+
+- **Username** is always visible.
+- **Display name** is shown only if `displayNamePublic` is true.
+- **Bio** is shown only if `bioPublic` is true.
+- If the currently logged-in user visits their own public profile URL, they are
+  redirected to the editable profile page at `/profile`.
+- Clickable avatars throughout the app (e.g. team member lists, bingo cards,
+  leaderboard) link to `/profile/[userId]`.
+
