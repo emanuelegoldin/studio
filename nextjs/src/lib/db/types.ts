@@ -238,6 +238,16 @@ export interface ReviewVote {
   updatedAt: Date;
 }
 
+// Team leaderboard entry (persisted)
+// Spec: 12-team-tabs.md
+export interface TeamLeaderboardEntry {
+  userId: string;
+  teamId: string;
+  firstBingoAt: Date | null;
+  completedTasks: number;
+  updatedAt: Date;
+}
+
 // Extended types for API responses
 
 export interface ReviewThreadWithDetails extends ReviewThread {

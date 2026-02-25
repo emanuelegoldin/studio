@@ -20,8 +20,10 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "./ui/button";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
+import { hasBingo } from "@/lib/shared/bingo-utils";
 import { JokerCell } from "./cell/joker";
 import { ResolutionCell } from "./cell/resolution-cell";
+import { Confetti } from "./confetti";
 
 // ── WebSocket helpers ─────────────────────────────────────────────
 
@@ -86,6 +88,41 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
   // Sort cells by position
   const sortedCells = [...cells].sort((a, b) => a.position - b.position);
   const [editMode, setEditMode] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  // ── Confetti: detect when a bingo line is newly completed ─────
+  // Keep a snapshot of the previous cells so we can compare.
+  const prevCellsRef = useRef<BingoCell[] | null>(null);
+
+  useEffect(() => {
+    const prev = prevCellsRef.current;
+    // Always update the snapshot for the next comparison
+    prevCellsRef.current = sortedCells;
+
+    // Skip initial render (no previous state to compare against)
+    if (!prev) return;
+
+    const hadBingo = hasBingo(prev);
+    const nowHasBingo = hasBingo(sortedCells);
+
+    // Only fire confetti on the transition false → true
+    if (hadBingo || !nowHasBingo) return;
+
+    // Check whether the *only* state change was completed → pending_review.
+    // If so, suppress confetti — a proof request isn't a celebration moment.
+    const prevByPos = new Map(prev.map((c) => [c.position, c]));
+    const hasNonReviewTransition = sortedCells.some((cell) => {
+      const old = prevByPos.get(cell.position);
+      if (!old) return false;
+      if (old.state === cell.state) return false;
+      // A cell changed state — is it something other than completed→pending_review?
+      return !(old.state === CellState.COMPLETED && cell.state === CellState.PENDING_REVIEW);
+    });
+
+    if (hasNonReviewTransition) {
+      setShowConfetti(true);
+    }
+  }, [sortedCells]);
 
   // ── WebSocket lifecycle ───────────────────────────────────────
   const wsRef = useRef<WebSocket | null>(null);
@@ -175,6 +212,9 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
 
   return (
     <CardWsContext.Provider value={{ broadcastCardRefresh }}>
+      {/* Confetti overlay — self-destructs after the animation */}
+      {showConfetti && <Confetti />}
+
       <div className="space-y-3">
         {isOwner && (
           <div className="flex items-center justify-between gap-3">

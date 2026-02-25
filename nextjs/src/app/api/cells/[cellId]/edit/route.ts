@@ -31,7 +31,6 @@ export async function PUT(
 
     const sourceType = body?.sourceType;
     const sourceUserId = typeof body?.sourceUserId === 'string' ? body.sourceUserId : null;
-    const isEmpty = Boolean(body?.isEmpty);
     const resolutionId = typeof body?.resolutionId === 'string' ? body.resolutionId : null;
     const teamProvidedResolutionId = typeof body?.teamProvidedResolutionId === 'string' ? body.teamProvidedResolutionId : null;
 
@@ -57,19 +56,11 @@ export async function PUT(
       );
     }
 
-    if (sourceType === 'empty' && !isEmpty) {
-      return NextResponse.json(
-        { error: 'Empty cells must set isEmpty=true' },
-        { status: 400 }
-      );
-    }
-
     const result = await updateCellContent(cellId, currentUser.id, {
       resolutionId,
       teamProvidedResolutionId,
       sourceType,
       sourceUserId,
-      isEmpty,
     });
 
     if (!result.success) {

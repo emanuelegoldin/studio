@@ -13,6 +13,7 @@ import type {
 } from './types';
 import { randomUUID } from 'crypto';
 import { isTeamMember } from './team-repository';
+import { refreshLeaderboardEntry } from './leaderboard-repository';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { PoolConnection } from 'mysql2/promise';
@@ -204,6 +205,9 @@ export async function requestProof(
     }
 
     await connection.commit();
+
+    // Refresh leaderboard: completed → pending_review affects completed_tasks count
+    await refreshLeaderboardEntry(cellInfo.team_id, cellInfo.card_user_id);
 
     const threadRows = await query<ThreadRow[]>(
       `SELECT * FROM review_threads WHERE id = ?`,
@@ -522,7 +526,12 @@ export async function submitVote(
     }
 
     await connection.commit();
-    deleteThreadFiles(fileRows)
+    await deleteThreadFiles(fileRows)
+
+    // Refresh persisted leaderboard data after vote-driven state change
+    if (threadClosed) {
+      await refreshLeaderboardEntry(cellInfo.team_id, thread.completedByUserId);
+    }
 
     return { success: true, vote: savedVote, threadClosed };
   } catch (error) {
