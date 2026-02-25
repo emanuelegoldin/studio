@@ -6,7 +6,7 @@
  * or diagonal on their 5×5 bingo card.
  *
  * A cell counts as "done" when its state is `completed`, `accomplished`,
- * or `pending_review`, or when it is the center joker cell.
+ * or when it is the center joker cell.
  */
 
 import { CellState } from "@/lib/shared/types";
@@ -23,7 +23,6 @@ export interface BingoCellForDetection {
 const DONE_STATES: ReadonlySet<CellState> = new Set([
   CellState.COMPLETED,
   CellState.ACCOMPLISHED,
-  CellState.PENDING_REVIEW,
 ]);
 
 /** Check whether a single cell counts as "done". */
