@@ -25,6 +25,8 @@ env:
   NEXTJS_DOCKERFILE: nextjs/docker/Dockerfile.nextjs
   FLYWAY_DOCKERFILE: nextjs/docker/Dockerfile.flyway
   NEXTJS_APP_CONTEXT: nextjs/
+  WS_DOCKERFILE: ws-server/Dockerfile
+  WS_CONTEXT: ws-server/
 
 jobs:
   build:
@@ -82,3 +84,14 @@ jobs:
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/flyway:latest
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/flyway:${{ github.sha }}
+      - name: Create Websocket image
+        run: |
+          docker build \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ws-server:latest \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ws-server:${{ github.sha }} \
+            -f ${{ env.WS_DOCKERFILE }} \
+            ${{ env.WS_CONTEXT }}
+      - name: Push Websocket image
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ws-server:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/ws-server:${{ github.sha }}
