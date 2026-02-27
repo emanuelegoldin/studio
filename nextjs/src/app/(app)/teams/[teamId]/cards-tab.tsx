@@ -9,7 +9,9 @@
  * are view-only.
  */
 
+import { useMemo } from "react";
 import { BingoCard } from "@/components/bingo-card";
+import { TeamMembersProvider } from "@/components/team-members-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +27,15 @@ interface CardsTabProps {
 }
 
 export function CardsTab({ team, cards, currentUserId, onCellUpdate, onRefresh }: CardsTabProps) {
+  // Build the userId → username map once from the already-loaded team data.
+  const membersMap = useMemo(
+    () =>
+      Object.fromEntries(
+        team.members.map((m) => [m.user.userId, m.user.username])
+      ),
+    [team.members]
+  );
+
   if (team.status === "forming") {
     return (
       <Card>
@@ -50,6 +61,7 @@ export function CardsTab({ team, cards, currentUserId, onCellUpdate, onRefresh }
   }
 
   return (
+    <TeamMembersProvider members={membersMap}>
     <div className="space-y-8">
       <h2 className="text-2xl font-bold font-headline">Bingo Cards</h2>
 
@@ -98,5 +110,6 @@ export function CardsTab({ team, cards, currentUserId, onCellUpdate, onRefresh }
         );
       })}
     </div>
+    </TeamMembersProvider>
   );
 }
