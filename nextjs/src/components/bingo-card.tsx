@@ -6,15 +6,14 @@
  *
  * Real-time behaviour
  * -------------------
- * Each mounted BingoCard opens a WebSocket connection, joins a room
- * keyed by `teamId`, and listens for `refresh-card` events.  When
- * another client broadcasts a card-refresh message (e.g. after a cell
- * state change), every other viewer automatically re-fetches card data
- * via the `onRefresh` callback supplied by the parent page.
+ * The WebSocket connection is managed by `TeamWsProvider` at the page
+ * level — one connection per team, shared by every card rendered on
+ * the page.  This component consumes the `useTeamWs()` context to
+ * broadcast `card-refresh` messages after cell-level mutations.
  *
  * Child components (e.g. ResolutionCell, CellThreadDialog) use the
- * `CardWsContext` to send `card-refresh` messages after they persist
- * mutations so that other team members see the update instantly.
+ * re-exported `useCardWsBroadcast` hook which delegates to the same
+ * team-level WebSocket.
  */
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
@@ -24,24 +23,14 @@ import { hasBingo } from "@/lib/shared/bingo-utils";
 import { JokerCell } from "./cell/joker";
 import { ResolutionCell } from "./cell/resolution-cell";
 import { Confetti } from "./confetti";
-
-// ── WebSocket helpers ─────────────────────────────────────────────
-
-function getWsUrl(): string | null {
-  if (typeof window !== "undefined") {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${window.location.host}/ws`;
-  }
-  return null;
-}
+import { useTeamWs } from "./team-ws-provider";
 
 // ── Context for child components to broadcast card-refresh ────────
 
 /**
  * `CardWsContext` exposes a function that child components can call
- * after they persist a cell-level mutation.  The function sends a
- * `card-refresh` WS message so every other viewer in the same team
- * room re-fetches their cards.
+ * after they persist a cell-level mutation.  Delegates to the
+ * team-level `TeamWsProvider`.
  */
 export const CardWsContext = createContext<{
   broadcastCardRefresh: () => void;
@@ -90,6 +79,9 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
   const [editMode, setEditMode] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
+  // ── Use team-level WebSocket from TeamWsProvider ──────────────
+  const { broadcastCardRefresh } = useTeamWs();
+
   // ── Confetti: detect when a bingo line is newly completed ─────
   // Keep a snapshot of the previous cells so we can compare.
   const prevCellsRef = useRef<BingoCell[] | null>(null);
@@ -123,61 +115,6 @@ export function BingoCard({ cells, isOwner = false, teamId, currentUserId, onCel
       setShowConfetti(true);
     }
   }, [sortedCells]);
-
-  // ── WebSocket lifecycle ───────────────────────────────────────
-  const wsRef = useRef<WebSocket | null>(null);
-
-  /**
-   * Stable reference to the latest `onRefresh` so the WS message
-   * handler always calls the current callback without re-opening
-   * the socket on every render.
-   */
-  const onRefreshRef = useRef(onRefresh);
-  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
-
-  useEffect(() => {
-    if (!teamId) return;
-    const wsUrl = getWsUrl();
-    if (!wsUrl) return;
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      const joinMessage: JoinCardRoomMessage = {
-        type: "join-card-room",
-        body: { teamId },
-      };
-      ws.send(JSON.stringify(joinMessage));
-    };
-
-    ws.onmessage = () => {
-      // Any message from the server in this room means "refresh".
-      onRefreshRef.current?.();
-    };
-
-    ws.onerror = (e) => {
-      console.error("[BingoCard] WebSocket error:", e);
-    };
-
-    return () => {
-      if (wsRef.current === ws) wsRef.current = null;
-      try { ws.close(); } catch { /* ignore */ }
-    };
-  }, [teamId]);
-
-  /** Send a `card-refresh` message so other viewers re-fetch. */
-  const broadcastCardRefresh = useCallback(() => {
-    if (!teamId) return;
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const msg: CardRefreshMessage = {
-        type: "card-refresh",
-        body: { teamId },
-      };
-      ws.send(JSON.stringify(msg));
-    }
-  }, [teamId]);
 
   // ── Wrapped callbacks ─────────────────────────────────────────
   // Child components call these instead of the raw props.

@@ -15,3 +15,17 @@ directly from the table instead of computing values on every request.
 - Foreign keys to `users` and `teams` with `ON DELETE CASCADE`.
 - Rows are bulk-initialized when a game starts and upserted on every cell state
   change.
+
+## 2.0.4 - Fix is_empty Excludes Team Cells
+
+Corrects the `is_empty` virtual generated column on `bingo_cells`.
+
+The previous expression `(resolution_id IS NULL AND team_provided_resolution_id IS NULL)`
+incorrectly flagged the team-goal cell as empty because it carries no FK to
+either `resolutions` or `team_provided_resolutions` — it resolves its text
+from `teams.team_resolution_text` via a JOIN at read time.
+
+New expression: `(resolution_id IS NULL AND team_provided_resolution_id IS NULL AND source_type = 'empty')`
+
+This ensures only cells explicitly inserted with `source_type = 'empty'` are
+considered empty, while team-goal cells render normally.

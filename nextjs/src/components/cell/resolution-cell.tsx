@@ -1,4 +1,3 @@
-import { useToast } from "@/hooks/use-toast";
 import { CellSourceType, CellState, ProofStatus } from "@/lib/shared/types";
 import { cn } from "@/lib/utils";
 import { Check, Hourglass, ThumbsUp, X } from "lucide-react";
@@ -7,6 +6,7 @@ import { MarkCellCompleteDialog } from "../dialogs/complete-dialog";
 import { EditCellDialog } from "../dialogs/edit-cell";
 import { RequestProofDialog } from "../dialogs/request-proof";
 import { CellThreadDialog } from "../dialogs/thread-dialog";
+import { useTeamMembers } from "../team-members-context";
 import { Badge } from "../ui/badge";
 import { Cell } from "./cell";
 import { BingoCell } from "./types";
@@ -36,8 +36,7 @@ export const ResolutionCell = ({
 }: ResolutionCellProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | null>(null);
-    const [usernames, setUsernames] = useState<Record<string, string>>({});
-    const { toast } = useToast();
+    const usernames = useTeamMembers();
 
     const handleClick = () => {
         if (!canInteract) return;
@@ -76,26 +75,10 @@ export const ResolutionCell = ({
     };
 
     useEffect(() => {
-        // Fetch username for the cell's source user (client-safe via API)
-        const fetchUsernames = async () => {
-            const teamMemberUsernamesRes = await fetch(`/api/teams/${teamId}/members`);
-            const teamMemberUsernamesData: { members?: Record<string, string>; error?: string } =
-                await teamMemberUsernamesRes.json().catch(() => ({}));
-            if (!teamMemberUsernamesRes.ok) {
-                toast({
-                    title: 'Error',
-                    description: teamMemberUsernamesData?.error || 'Failed to load team member usernames',
-                    variant: 'destructive',
-                });
-                return;
-            }
-            setUsernames(teamMemberUsernamesData.members ?? {});
-        };
-        fetchUsernames();
         if (!isModalOpen) {
             setModalMode(null);
         }
-    }, [isModalOpen, teamId, toast]);
+    }, [isModalOpen]);
 
     const stateConfig = {
         pending: { icon: null, color: "bg-card hover:bg-secondary/50", text: "text-card-foreground" },
