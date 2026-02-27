@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BingoCard } from "@/components/bingo-card";
 import { TeamWsProvider } from "@/components/team-ws-provider";
+import { TeamMembersProvider, TeamMembersMap } from "@/components/team-members-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, Plus } from "lucide-react";
@@ -219,8 +220,14 @@ export default function DashboardPage() {
 
   return (
     <div className="container mx-auto space-y-8">
-      {activeCards.map(({ team, card }) => (
+      {activeCards.map(({ team, card }) => {
+        const membersMap: TeamMembersMap = {};
+        for (const m of team.members) {
+          membersMap[m.user.userId] = m.user.displayName || m.user.username;
+        }
+        return (
         <TeamWsProvider key={team.id} teamId={team.id} onRefresh={() => reloadCardForTeam(team.id)}>
+        <TeamMembersProvider members={membersMap}>
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline text-2xl">
@@ -241,8 +248,10 @@ export default function DashboardPage() {
             />
           </CardContent>
         </Card>
+        </TeamMembersProvider>
         </TeamWsProvider>
-      ))}
+        );
+      })}
     </div>
   );
 }
