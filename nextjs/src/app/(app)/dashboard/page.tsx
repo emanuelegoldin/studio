@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { BingoCard } from "@/components/bingo-card";
+import { TeamWsProvider } from "@/components/team-ws-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, Plus } from "lucide-react";
@@ -219,7 +220,8 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto space-y-8">
       {activeCards.map(({ team, card }) => (
-        <Card key={team.id} className="w-full max-w-4xl mx-auto">
+        <TeamWsProvider key={team.id} teamId={team.id} onRefresh={() => reloadCardForTeam(team.id)}>
+        <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline text-2xl">
               Your Bingo Card for "{team.name}"
@@ -239,6 +241,7 @@ export default function DashboardPage() {
             />
           </CardContent>
         </Card>
+        </TeamWsProvider>
       ))}
     </div>
   );

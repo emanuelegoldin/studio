@@ -12,6 +12,7 @@
 import { useMemo } from "react";
 import { BingoCard } from "@/components/bingo-card";
 import { TeamMembersProvider } from "@/components/team-members-context";
+import { TeamWsProvider } from "@/components/team-ws-provider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -61,6 +62,7 @@ export function CardsTab({ team, cards, currentUserId, onCellUpdate, onRefresh }
   }
 
   return (
+    <TeamWsProvider teamId={team.id} onRefresh={onRefresh}>
     <TeamMembersProvider members={membersMap}>
     <div className="space-y-8">
       <h2 className="text-2xl font-bold font-headline">Bingo Cards</h2>
@@ -111,5 +113,6 @@ export function CardsTab({ team, cards, currentUserId, onCellUpdate, onRefresh }
       })}
     </div>
     </TeamMembersProvider>
+    </TeamWsProvider>
   );
 }
