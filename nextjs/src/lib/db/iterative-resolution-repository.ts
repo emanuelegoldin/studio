@@ -54,8 +54,8 @@ export async function createIterativeResolution(
   if (!title || title.trim().length === 0) {
     throw new Error('Iterative resolution title must be non-empty');
   }
-  if (numberOfRepetition < 1) {
-    throw new Error('Number of repetitions must be at least 1');
+  if (numberOfRepetition < 2) {
+    throw new Error('Number of repetitions must be at least 2');
   }
 
   const id = uuidv4();
@@ -130,8 +130,8 @@ export async function updateIterativeResolution(
   if (!title) {
     throw new Error('Iterative resolution title must be non-empty');
   }
-  if (numberOfRepetition < 1) {
-    throw new Error('Number of repetitions must be at least 1');
+  if (numberOfRepetition < 2) {
+    throw new Error('Number of repetitions must be at least 2');
   }
 
   await query(
