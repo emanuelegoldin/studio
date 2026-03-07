@@ -1,6 +1,6 @@
 /**
  * Bingo Card Repository - Database operations for bingo cards
- * Spec Reference: 05-bingo-card-generation.md, 06-bingo-gameplay.md
+ * Spec Reference: 05-bingo-card-generation.md, 06-bingo-gameplay.md, 13-cross-team-cell-sync.md
  */
 
 import { query, getConnection } from './connection';
@@ -17,6 +17,7 @@ import { getTeamProvidedResolutionsForUser } from './team-repository';
 import { getRandomResolutions } from './resolution-repository';
 import { CellSourceType, CellState, ProofStatus, ResolutionType } from '../shared/types';
 import { refreshLeaderboardEntry } from './leaderboard-repository';
+import type { PoolConnection } from 'mysql2/promise';
 
 // Row types from database
 interface CardRow {
@@ -507,14 +508,14 @@ async function getCellsWithProofs(cardId: string): Promise<BingoCellWithProof[]>
 
 /**
  * Update cell state
- * Spec: 06-bingo-gameplay.md - Card State
- * Updated: Support new states for proof workflow
+ * Spec: 06-bingo-gameplay.md - Card State, 13-cross-team-cell-sync.md
+ * Updated: Support new states for proof workflow + cross-team propagation
  */
 export async function updateCellState(
   cellId: string,
   userId: string,
   newState: CellState
-): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+): Promise<{ success: boolean; error?: string; cell?: BingoCell; affectedTeamIds?: string[] }> {
   // Spec: 05-bingo-card-generation.md, 06-bingo-gameplay.md - Joker is implicit and not modifiable.
   if (cellId.startsWith('joker:')) {
     return { success: false, error: 'Joker cell cannot be modified' };
@@ -522,9 +523,9 @@ export async function updateCellState(
 
   // Get the cell and verify ownership
   const cellRows = await query<Array<
-    { id: string; is_empty: boolean | number; state: CellState; card_user_id: string; team_id: string }
+    { id: string; resolution_id: string | null; resolution_type: ResolutionType; is_empty: boolean | number; state: CellState; card_user_id: string; team_id: string }
   >>(
-    `SELECT c.id, c.is_empty, c.state, bc.user_id as card_user_id, bc.team_id
+    `SELECT c.id, c.resolution_id, c.resolution_type, c.is_empty, c.state, bc.user_id as card_user_id, bc.team_id
      FROM bingo_cells c
      JOIN bingo_cards bc ON c.card_id = bc.id
      WHERE c.id = ?`,
@@ -584,12 +585,23 @@ export async function updateCellState(
   // Refresh persisted leaderboard data after state change
   await refreshLeaderboardEntry(cell.team_id, userId);
 
+  // Spec: 13-cross-team-cell-sync.md — propagate owner-driven completion to sibling cells
+  let affectedTeamIds: string[] = [];
+  if (newState === CellState.COMPLETED && cell.resolution_id) {
+    affectedTeamIds = await propagateCompletionToSiblings(
+      cellId,
+      cell.resolution_id,
+      cell.resolution_type,
+      cell.card_user_id
+    );
+  }
+
   const updatedRow = await getResolvedCellRowById(cellId);
   if (!updatedRow) {
     return { success: false, error: 'Cell not found' };
   }
 
-  return { success: true, cell: rowToCell(updatedRow) };
+  return { success: true, cell: rowToCell(updatedRow), affectedTeamIds };
 }
 
 export async function updateCellContent(
@@ -686,12 +698,12 @@ export async function updateCellContent(
 }
 /**
  * Undo completion - revert cell to pending and close any open thread
- * Spec: Resolution Review & Proof Workflow - Undo Completion
+ * Spec: Resolution Review & Proof Workflow - Undo Completion, 13-cross-team-cell-sync.md
  */
 export async function undoCompletion(
   cellId: string,
   userId: string
-): Promise<{ success: boolean; error?: string; cell?: BingoCell }> {
+): Promise<{ success: boolean; error?: string; cell?: BingoCell; affectedTeamIds?: string[] }> {
   const cellRows = await query<(CellRow & { card_user_id: string; team_id: string })[]>(
     `SELECT c.*, bc.user_id as card_user_id, bc.team_id
      FROM bingo_cells c
@@ -721,34 +733,8 @@ export async function undoCompletion(
   try {
     await connection.beginTransaction();
 
-    // Check for open review thread
-    const [threadRowsUnknown] = await connection.execute(
-      `SELECT id, status FROM review_threads WHERE cell_id = ? AND status = 'open'`,
-      [cellId]
-    );
-
-    const threadRows = threadRowsUnknown as Array<{ id: string; status: string }>;
-
-    if (threadRows.length > 0) {
-      const threadId = threadRows[0].id;
-
-      // Delete messages and files
-      await connection.execute(
-        `DELETE FROM review_messages WHERE thread_id = ?`,
-        [threadId]
-      );
-
-      await connection.execute(
-        `DELETE FROM review_files WHERE thread_id = ?`,
-        [threadId]
-      );
-
-      // Close the thread
-      await connection.execute(
-        `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
-        [threadId]
-      );
-    }
+    // Close any open review thread for this cell
+    await closeOpenReviewThreadForCell(cellId, connection);
 
     // Optimistic lock: only transition if cell is still in a valid
     // "completable" state.  Owner actions prevail over concurrent
@@ -770,12 +756,23 @@ export async function undoCompletion(
     // Refresh persisted leaderboard data after undo
     await refreshLeaderboardEntry(cell.team_id, userId);
 
+    // Spec: 13-cross-team-cell-sync.md — propagate owner-driven undo to sibling cells
+    let affectedTeamIds: string[] = [];
+    if (cell.resolution_id) {
+      affectedTeamIds = await propagateUndoToSiblings(
+        cellId,
+        cell.resolution_id,
+        cell.resolution_type as ResolutionType,
+        cell.card_user_id
+      );
+    }
+
     const updatedRows = await query<CellRow[]>(
       `SELECT * FROM bingo_cells WHERE id = ?`,
       [cellId]
     );
 
-    return { success: true, cell: rowToCell(updatedRows[0]) };
+    return { success: true, cell: rowToCell(updatedRows[0]), affectedTeamIds };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -915,20 +912,21 @@ export async function reportDuplicate(
  * Auto-transition bingo cell state for compound/iterative resolutions.
  * When the resolution is fully completed (all subtasks done or counter reached),
  * the cell transitions from pending → completed.
- * When the resolution becomes incomplete again, the cell transitions from completed → pending.
+ * When the resolution becomes incomplete again, the cell transitions from
+ * completed/pending_review/accomplished → pending (with review thread cleanup).
  *
- * This skips cells in pending_review or accomplished states (controlled by voting system).
+ * Spec: 13-cross-team-cell-sync.md — extended revert handles all non-pending states.
  *
  * @param resolutionId - The compound or iterative resolution ID
  * @param resolutionType - 'compound' or 'iterative'
  * @param isComplete - Whether the resolution is now fully completed
- * @returns Array of updated cells, or empty if no transitions occurred
+ * @returns Object with updated cells and affected team IDs
  */
 export async function autoTransitionCellState(
   resolutionId: string,
   resolutionType: ResolutionType,
   isComplete: boolean
-): Promise<BingoCell[]> {
+): Promise<{ updatedCells: BingoCell[]; affectedTeamIds: string[] }> {
   // Find all bingo cells linked to this resolution
   const cellRows = await query<Array<{ id: string; state: CellState; team_id: string; user_id: string }>>(
     `SELECT c.id, c.state, bc.team_id, bc.user_id
@@ -939,10 +937,11 @@ export async function autoTransitionCellState(
   );
 
   if (cellRows.length === 0) {
-    return [];
+    return { updatedCells: [], affectedTeamIds: [] };
   }
 
   const updatedCells: BingoCell[] = [];
+  const affectedTeamIdSet = new Set<string>();
 
   for (const cellRow of cellRows) {
     let newState: CellState | null = null;
@@ -950,19 +949,40 @@ export async function autoTransitionCellState(
     if (isComplete && cellRow.state === CellState.PENDING) {
       // Auto-complete: pending → completed
       newState = CellState.COMPLETED;
-    } else if (!isComplete && cellRow.state === CellState.COMPLETED) {
-      // Auto-revert: completed → pending
+    } else if (!isComplete && cellRow.state !== CellState.PENDING) {
+      // Auto-revert: any non-pending state → pending
+      // Spec: 13-cross-team-cell-sync.md — handle pending_review and accomplished too
       newState = CellState.PENDING;
     }
 
-    if (newState) {
+    if (newState === CellState.PENDING && cellRow.state === CellState.PENDING_REVIEW) {
+      // Close any open review thread before reverting from pending_review
+      const connection = await getConnection();
+      try {
+        await connection.beginTransaction();
+        await closeOpenReviewThreadForCell(cellRow.id, connection);
+        await connection.execute(
+          `UPDATE bingo_cells SET state = 'pending' WHERE id = ? AND state = 'pending_review'`,
+          [cellRow.id]
+        );
+        await connection.commit();
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } else if (newState) {
       await query(
         `UPDATE bingo_cells SET state = ? WHERE id = ? AND state = ?`,
         [newState, cellRow.id, cellRow.state]
       );
+    }
 
+    if (newState) {
       // Refresh leaderboard for this user/team
       await refreshLeaderboardEntry(cellRow.team_id, cellRow.user_id);
+      affectedTeamIdSet.add(cellRow.team_id);
 
       const updatedRow = await getResolvedCellRowById(cellRow.id);
       if (updatedRow) {
@@ -971,5 +991,172 @@ export async function autoTransitionCellState(
     }
   }
 
-  return updatedCells;
+  return { updatedCells, affectedTeamIds: [...affectedTeamIdSet] };
+}
+
+// ── Cross-Team Cell Sync Helpers ────────────────────────────────────────
+// Spec: 13-cross-team-cell-sync.md
+
+/**
+ * Find sibling cells: all bingo_cells that share the same resolution_id AND
+ * resolution_type, belong to a card owned by the same user, but are NOT the
+ * originating cell.
+ *
+ * @param originCellId - The cell that triggered the action
+ * @param resolutionId - The resolution ID shared across cards
+ * @param resolutionType - The resolution type discriminator
+ * @param cardUserId - The user who owns the card(s)
+ * @returns Array of sibling cell rows with id, state, team_id, user_id
+ */
+async function findSiblingCells(
+  originCellId: string,
+  resolutionId: string,
+  resolutionType: ResolutionType,
+  cardUserId: string
+): Promise<Array<{ id: string; state: CellState; team_id: string; user_id: string }>> {
+  return query<Array<{ id: string; state: CellState; team_id: string; user_id: string }>>(
+    `SELECT c.id, c.state, bc.team_id, bc.user_id
+     FROM bingo_cells c
+     JOIN bingo_cards bc ON c.card_id = bc.id
+     WHERE c.resolution_id = ?
+       AND c.resolution_type = ?
+       AND bc.user_id = ?
+       AND c.id != ?`,
+    [resolutionId, resolutionType, cardUserId, originCellId]
+  );
+}
+
+/**
+ * Propagate a completion event to sibling cells across other teams.
+ * Only transitions siblings from `pending` → `completed`.
+ *
+ * Spec: 13-cross-team-cell-sync.md §1 — Mark Completed cross-team propagation
+ *
+ * @returns Array of team IDs where siblings were updated
+ */
+async function propagateCompletionToSiblings(
+  originCellId: string,
+  resolutionId: string,
+  resolutionType: ResolutionType,
+  cardUserId: string
+): Promise<string[]> {
+  const siblings = await findSiblingCells(originCellId, resolutionId, resolutionType, cardUserId);
+  const affectedTeamIds: string[] = [];
+
+  for (const sibling of siblings) {
+    if (sibling.state === CellState.PENDING) {
+      const result = await query<{ affectedRows: number }>(
+        `UPDATE bingo_cells SET state = 'completed' WHERE id = ? AND state = 'pending'`,
+        [sibling.id]
+      );
+      if (result.affectedRows > 0) {
+        await refreshLeaderboardEntry(sibling.team_id, sibling.user_id);
+        affectedTeamIds.push(sibling.team_id);
+      }
+    }
+  }
+
+  return affectedTeamIds;
+}
+
+/**
+ * Propagate an undo event to sibling cells across other teams.
+ * Transitions siblings from any non-pending state → `pending`, closing open
+ * review threads on siblings in `pending_review`.
+ *
+ * Spec: 13-cross-team-cell-sync.md §2 — Undo Completion cross-team propagation
+ *
+ * @returns Array of team IDs where siblings were updated
+ */
+async function propagateUndoToSiblings(
+  originCellId: string,
+  resolutionId: string,
+  resolutionType: ResolutionType,
+  cardUserId: string
+): Promise<string[]> {
+  const siblings = await findSiblingCells(originCellId, resolutionId, resolutionType, cardUserId);
+  const affectedTeamIds: string[] = [];
+
+  for (const sibling of siblings) {
+    if (sibling.state === CellState.PENDING) continue; // Already pending, skip
+
+    const connection = await getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // If sibling is in pending_review, close its open review thread first
+      if (sibling.state === CellState.PENDING_REVIEW) {
+        await closeOpenReviewThreadForCell(sibling.id, connection);
+      }
+
+      // Transition to pending
+      const [updateResult] = await connection.execute(
+        `UPDATE bingo_cells SET state = 'pending' WHERE id = ? AND state IN ('completed', 'pending_review', 'accomplished')`,
+        [sibling.id]
+      );
+      const affected = (updateResult as { affectedRows: number }).affectedRows;
+
+      await connection.commit();
+
+      if (affected > 0) {
+        await refreshLeaderboardEntry(sibling.team_id, sibling.user_id);
+        affectedTeamIds.push(sibling.team_id);
+      }
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  return affectedTeamIds;
+}
+
+/**
+ * Close any open review thread for a cell within an existing transaction.
+ * Deletes messages, files (records only — physical file deletion should follow),
+ * and marks the thread as closed.
+ *
+ * @param cellId - The bingo cell ID
+ * @param connection - The active database connection (within a transaction)
+ */
+async function closeOpenReviewThreadForCell(
+  cellId: string,
+  connection: PoolConnection
+): Promise<void> {
+  const [threadRowsUnknown] = await connection.execute(
+    `SELECT id FROM review_threads WHERE cell_id = ? AND status = 'open'`,
+    [cellId]
+  );
+
+  const threadRows = threadRowsUnknown as Array<{ id: string }>;
+
+  if (threadRows.length === 0) return;
+
+  const threadId = threadRows[0].id;
+
+  // Delete messages
+  await connection.execute(
+    `DELETE FROM review_messages WHERE thread_id = ?`,
+    [threadId]
+  );
+
+  // Delete file records (physical file cleanup is a best-effort background task)
+  await connection.execute(
+    `DELETE FROM review_files WHERE thread_id = ?`,
+    [threadId]
+  );
+
+  // Delete votes
+  await connection.execute(
+    `DELETE FROM review_votes WHERE thread_id = ?`,
+    [threadId]
+  );
+
+  // Close thread
+  await connection.execute(
+    `UPDATE review_threads SET status = 'closed', closed_at = NOW() WHERE id = ?`,
+    [threadId]
+  );
 }

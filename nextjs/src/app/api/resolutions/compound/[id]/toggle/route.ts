@@ -48,14 +48,15 @@ export async function PATCH(
     }
 
     // Auto-transition bingo cells: all subtasks done → completed, otherwise → pending
+    // Spec: 13-cross-team-cell-sync.md — propagation happens to all teams
     const allDone = resolution.subtasks.every((s) => s.completed);
-    const updatedCells = await autoTransitionCellState(
+    const { updatedCells, affectedTeamIds } = await autoTransitionCellState(
       id,
       ResolutionType.COMPOUND,
       allDone
     );
 
-    return NextResponse.json({ resolution, updatedCells });
+    return NextResponse.json({ resolution, updatedCells, affectedTeamIds });
   } catch (error) {
     console.error('Toggle compound subtask error:', error);
     const message = error instanceof Error ? error.message : 'An error occurred';

@@ -80,6 +80,7 @@ export async function PUT(
 
     // Update cell state
     // Spec: 06-bingo-gameplay.md - Only the card owner can change their card's cell states
+    // Spec: 13-cross-team-cell-sync.md - Propagate owner-driven changes across teams
     const result = await updateCellState(cellId, currentUser.id, state as CellState);
     
     if (!result.success) {
@@ -89,7 +90,10 @@ export async function PUT(
       );
     }
     
-    return NextResponse.json({ cell: result.cell });
+    return NextResponse.json({
+      cell: result.cell,
+      affectedTeamIds: result.affectedTeamIds ?? [],
+    });
   } catch (error) {
     console.error('Update cell error:', error);
     return NextResponse.json(

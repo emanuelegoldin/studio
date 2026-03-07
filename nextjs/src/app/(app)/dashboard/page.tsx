@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BingoCard } from "@/components/bingo-card";
 import { TeamWsProvider } from "@/components/team-ws-provider";
 import { TeamMembersProvider, TeamMembersMap } from "@/components/team-members-context";
+import { CrossTeamRefreshProvider } from "@/components/cross-team-refresh-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, Plus } from "lucide-react";
@@ -155,7 +156,16 @@ export default function DashboardPage() {
             });
 
       if (response.ok) {
+        const data = await response.json();
         await reloadCardForTeam(teamId);
+
+        // Spec 13: propagate to sibling cells in other teams
+        const affectedTeamIds: string[] = data.affectedTeamIds ?? [];
+        if (affectedTeamIds.length > 0) {
+          for (const tid of affectedTeamIds) {
+            await reloadCardForTeam(tid);
+          }
+        }
       } else {
         const data = await response.json();
         toast({
@@ -222,6 +232,7 @@ export default function DashboardPage() {
   }
 
   return (
+    <CrossTeamRefreshProvider onRefreshTeam={reloadCardForTeam}>
     <div className="container mx-auto space-y-8">
       {activeCards.map(({ team, card }) => {
         const membersMap: TeamMembersMap = {};
@@ -256,5 +267,6 @@ export default function DashboardPage() {
         );
       })}
     </div>
+    </CrossTeamRefreshProvider>
   );
 }

@@ -45,14 +45,15 @@ export async function PATCH(
     }
 
     // Auto-transition bingo cells: threshold met → completed
+    // Spec: 13-cross-team-cell-sync.md — propagation happens to all teams
     const isComplete = resolution.completedTimes >= resolution.numberOfRepetition;
-    const updatedCells = await autoTransitionCellState(
+    const { updatedCells, affectedTeamIds } = await autoTransitionCellState(
       id,
       ResolutionType.ITERATIVE,
       isComplete
     );
 
-    return NextResponse.json({ resolution, updatedCells });
+    return NextResponse.json({ resolution, updatedCells, affectedTeamIds });
   } catch (error) {
     console.error('Increment iterative resolution error:', error);
     return NextResponse.json({ error: 'An error occurred' }, { status: 500 });

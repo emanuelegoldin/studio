@@ -27,6 +27,7 @@ export async function POST(
 
     const { cellId } = await params;
 
+    // Spec: 13-cross-team-cell-sync.md - Propagate owner-driven undo across teams
     const result = await undoCompletion(cellId, currentUser.id);
     
     if (!result.success) {
@@ -36,7 +37,10 @@ export async function POST(
       );
     }
     
-    return NextResponse.json({ cell: result.cell });
+    return NextResponse.json({
+      cell: result.cell,
+      affectedTeamIds: result.affectedTeamIds ?? [],
+    });
   } catch (error) {
     console.error('Undo complete error:', error);
     return NextResponse.json(

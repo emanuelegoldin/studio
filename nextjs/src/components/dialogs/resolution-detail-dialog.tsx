@@ -27,6 +27,7 @@ import { CellState, ResolutionType, ProofStatus } from "@/lib/shared/types";
 import type { Subtask } from "@/lib/shared/types";
 import { cn } from "@/lib/utils";
 import { useTeamWs } from "../team-ws-provider";
+import { useCrossTeamRefresh } from "../cross-team-refresh-context";
 import type { WsIncomingMessage } from "../team-ws-provider";
 
 /* ─── Data types ─────────────────────────────────────────────────── */
@@ -189,14 +190,14 @@ export const ResolutionDetailDialog = ({
         <DialogFooter className="gap-2 sm:gap-0">
           {/* Owner + pending + non-automatic → Mark Complete */}
           {isOwner && cell.state === CellState.PENDING && !isAutomatic && onComplete && (
-            <Button onClick={() => { setIsOpen(false); onComplete(); }}>
+            <Button onClick={() => { onComplete(); setIsOpen(false); }}>
               <Check className="h-4 w-4 mr-2" /> Mark Complete
             </Button>
           )}
 
           {/* Owner + completed + non-automatic → Undo */}
           {isOwner && cell.state === CellState.COMPLETED && !isAutomatic && onUndo && (
-            <Button variant="outline" onClick={() => { setIsOpen(false); onUndo(); }}>
+            <Button variant="outline" onClick={() => { onUndo(); setIsOpen(false); }}>
               <Undo2 className="h-4 w-4 mr-2" /> Undo
             </Button>
           )}
@@ -239,6 +240,7 @@ const CompoundChecklist = ({ id, subtasks, isOwner, onRefresh }: CompoundCheckli
   const [localSubtasks, setLocalSubtasks] = useState<Subtask[]>(subtasks);
   const [loading, setLoading] = useState<number | null>(null);
   const { sendWsMessage, addMessageListener } = useTeamWs();
+  const { refreshTeams } = useCrossTeamRefresh();
 
   const completedCount = localSubtasks.filter((s) => s.completed).length;
   const totalCount = localSubtasks.length;
@@ -280,7 +282,7 @@ const CompoundChecklist = ({ id, subtasks, isOwner, onRefresh }: CompoundCheckli
           body: JSON.stringify({ subtaskIndex: index }),
         });
         if (res.ok) {
-          const { resolution } = await res.json();
+          const { resolution, affectedTeamIds } = await res.json();
           setLocalSubtasks(resolution.subtasks);
           onRefresh?.();
           // Notify other viewers of this resolution
@@ -288,12 +290,16 @@ const CompoundChecklist = ({ id, subtasks, isOwner, onRefresh }: CompoundCheckli
             type: "resolution-refresh",
             body: { resolutionId: id },
           });
+          // Spec 13: propagate cell state changes to sibling teams
+          if (affectedTeamIds?.length) {
+            refreshTeams(affectedTeamIds);
+          }
         }
       } finally {
         setLoading(null);
       }
     },
-    [id, loading, onRefresh, sendWsMessage]
+    [id, loading, onRefresh, sendWsMessage, refreshTeams]
   );
 
   return (
@@ -380,6 +386,7 @@ const IterativeCounter = ({
   const [completedTimes, setCompletedTimes] = useState(initialCompleted);
   const [loading, setLoading] = useState(false);
   const { sendWsMessage, addMessageListener } = useTeamWs();
+  const { refreshTeams } = useCrossTeamRefresh();
 
   const isComplete = completedTimes >= numberOfRepetition;
   const progressPercent = Math.min(
@@ -420,7 +427,7 @@ const IterativeCounter = ({
           method: "PATCH",
         });
         if (res.ok) {
-          const { resolution } = await res.json();
+          const { resolution, affectedTeamIds } = await res.json();
           setCompletedTimes(resolution.completedTimes);
           onRefresh?.();
           // Notify other viewers of this resolution
@@ -428,12 +435,16 @@ const IterativeCounter = ({
             type: "resolution-refresh",
             body: { resolutionId: id },
           });
+          // Spec 13: propagate cell state changes to sibling teams
+          if (affectedTeamIds?.length) {
+            refreshTeams(affectedTeamIds);
+          }
         }
       } finally {
         setLoading(false);
       }
     },
-    [id, loading, onRefresh, sendWsMessage]
+    [id, loading, onRefresh, sendWsMessage, refreshTeams]
   );
 
   return (

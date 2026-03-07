@@ -2,7 +2,6 @@ import { CellSourceType, CellState, ProofStatus, ResolutionType } from "@/lib/sh
 import { cn } from "@/lib/utils";
 import { Check, Hourglass, ThumbsUp, X } from "lucide-react";
 import { useState, useEffect } from "react";
-import { MarkCellCompleteDialog } from "../dialogs/complete-dialog";
 import { EditCellDialog } from "../dialogs/edit-cell";
 import { RequestProofDialog } from "../dialogs/request-proof";
 import { CellThreadDialog } from "../dialogs/thread-dialog";
@@ -40,7 +39,7 @@ export const ResolutionCell = ({
     onRefresh
 }: ResolutionCellProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [modalMode, setModalMode] = useState<'complete' | 'request_proof' | 'thread' | 'edit_cell' | 'detail' | null>(null);
+    const [modalMode, setModalMode] = useState<'request_proof' | 'thread' | 'edit_cell' | 'detail' | null>(null);
     const [detailData, setDetailData] = useState<ResolutionDetailData | null>(null);
     const usernames = useTeamMembers();
 
@@ -122,10 +121,9 @@ export const ResolutionCell = ({
 
     /* ── Detail dialog action callbacks ──────────────────────────── */
 
-    /** Owner wants to mark a base/team cell as complete — open the complete dialog. */
+    /** Owner wants to mark a base/team cell as complete — directly update (same as undo). */
     const handleCompleteFromDetail = () => {
-        setModalMode('complete');
-        setIsModalOpen(true);
+        onUpdate?.(cell.id, CellState.COMPLETED);
     };
 
     /** Owner wants to undo a completed base/team cell. */
@@ -227,16 +225,6 @@ export const ResolutionCell = ({
                         {cell.sourceType === CellSourceType.PERSONAL && "Personal"}
                     </Badge>
                 </Cell>
-            }
-            {modalMode === "complete" &&
-                <MarkCellCompleteDialog
-                    cell={{
-                        id: cell.id,
-                        resolutionText: cell.resolutionText
-                    }}
-                    open={isModalOpen}
-                    setIsOpen={setIsModalOpen}
-                    onUpdate={onUpdate} />
             }
             {modalMode === "request_proof" &&
                 <RequestProofDialog
