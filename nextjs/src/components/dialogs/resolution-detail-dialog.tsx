@@ -32,7 +32,7 @@ import type { WsIncomingMessage } from "../team-ws-provider";
 /* ─── Data types ─────────────────────────────────────────────────── */
 
 interface BaseData {
-  type: ResolutionType.BASE | ResolutionType.TEAM;
+  type: ResolutionType.BASE;
   id: string;
   title: string;
   description?: string | null;
@@ -108,7 +108,6 @@ const STATE_CONFIG: Record<string, {
 /** Human-readable type labels */
 const TYPE_LABELS: Record<string, string> = {
   [ResolutionType.BASE]: "Common",
-  [ResolutionType.TEAM]: "Team Goal",
   [ResolutionType.COMPOUND]: "Complex",
   [ResolutionType.ITERATIVE]: "Iterative",
 };
@@ -183,7 +182,7 @@ export const ResolutionDetailDialog = ({
           />
         )}
 
-        {(data.type === ResolutionType.BASE || data.type === ResolutionType.TEAM) && (
+        {data.type === ResolutionType.BASE && (
           <div className="py-2">
             {!data.description && (
               <p className="text-sm text-muted-foreground italic">No description provided.</p>
