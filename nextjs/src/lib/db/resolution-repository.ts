@@ -6,7 +6,7 @@
  * of every type (base, compound, iterative) lives in the `resolutions` table.
  */
 
-import { query, getConnection } from './connection';
+import { query } from './connection';
 import type { Resolution } from './types';
 import { ResolutionType, ResolutionScope } from '../shared/types';
 import type { Subtask } from '../shared/types';
