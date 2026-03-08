@@ -211,7 +211,7 @@ export const ResolutionCell = ({
                     <div className="absolute top-1 right-1">
                         {visualState !== 'pending' && config.icon}
                     </div>
-                    <Badge variant="outline" className="absolute bottom-1 right-1 text-xs">
+                    <Badge variant="outline" className="absolute bottom-1 right-1 text-xs hidden sm:inline-flex">
                         {cell.sourceType === CellSourceType.TEAM && "Team Goal"}
                         {cell.sourceType === CellSourceType.MEMBER_PROVIDED && (
                           cell.sourceUserId ? (
