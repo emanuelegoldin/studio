@@ -71,7 +71,7 @@ END$$
 
 DELIMITER ;
 
--- Add_Column procedure
+-- Create_Column procedure
 --    p_tableName: Name of the table to alter
 --    p_columnName: Name of the column to add
 --    p_columnType: Data type of the column (e.g. VARCHAR(255))
@@ -80,8 +80,8 @@ DELIMITER ;
 --    p_referencedTable: If not NULL, adds a foreign key constraint referencing this table's ID column
 -- This procedure is idempotent and can be safely re-run without affecting existing columns.
 DELIMITER $$
-DROP PROCEDURE IF EXISTS Add_Column$$
-CREATE PROCEDURE Add_Column(
+DROP PROCEDURE IF EXISTS Create_Column$$
+CREATE PROCEDURE Create_Column(
     IN p_tableName VARCHAR(255),
     IN p_columnName VARCHAR(255),
     IN p_columnType VARCHAR(255),
@@ -118,7 +118,7 @@ BEGIN
         DEALLOCATE PREPARE stmt;
         
         -- If a referenced table is specified, add a foreign key constraint
-        IF p_referencedTable IS NOT NULL THEN
+        IF p_referencedTable IS NOT NULL AND LOWER(TRIM(p_referencedTable)) != 'null' AND TRIM(p_referencedTable) != '' THEN
             SET v_sqlStatement = CONCAT(
                 'ALTER TABLE `', TRIM(p_tableName), '` ADD CONSTRAINT `fk_', TRIM(p_tableName), '_', TRIM(p_columnName), '` FOREIGN KEY (`', TRIM(p_columnName), '`) REFERENCES `', TRIM(p_referencedTable), '`(`', TRIM(p_referencedTable), 'ID`) ON DELETE CASCADE'
             );
@@ -131,3 +131,46 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+-- Drop_Column procedure
+--    p_tableName: Name of the table to alter
+--    p_columnName: Name of the column to drop
+-- This procedure is idempotent and can be safely re-run without affecting existing columns.
+DELIMITER $$
+DROP PROCEDURE IF EXISTS Drop_Column$$
+CREATE PROCEDURE Drop_Column(
+    IN p_tableName VARCHAR(255),
+    IN p_columnName VARCHAR(255)
+)
+MODIFIES SQL DATA
+NOT DETERMINISTIC
+COMMENT 'Drop a column from a table if it exists'
+BEGIN
+    DECLARE v_fkName VARCHAR(255);
+    DECLARE v_sqlStatement LONGTEXT;
+
+    -- Drop any FK constraint referencing this column first
+    SET v_fkName = (
+        SELECT CONSTRAINT_NAME
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = p_tableName
+          AND COLUMN_NAME = p_columnName
+          AND REFERENCED_TABLE_NAME IS NOT NULL
+        LIMIT 1
+    );
+    IF v_fkName IS NOT NULL THEN
+        SET v_sqlStatement = CONCAT('ALTER TABLE `', TRIM(p_tableName), '` DROP FOREIGN KEY `', v_fkName, '`');
+        SET @sql = v_sqlStatement;
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+
+    -- Now drop the column
+    SET v_sqlStatement = CONCAT('ALTER TABLE `', TRIM(p_tableName), '` DROP COLUMN IF EXISTS `', TRIM(p_columnName), '`');
+    SET @sql = v_sqlStatement;
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
